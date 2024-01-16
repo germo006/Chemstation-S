@@ -7,7 +7,7 @@ for ii = 1:11
     plot(CTD.bvfrq(:,ii),CTD.de(:,ii)); axis ij;
     hold on; plot(XX(:,ii),CTD.de(:,ii), "-.");
     subplot(1,3,3)
-    plot(Kz(:,ii),CTD.de(:,ii)); axis ij;
+    plot(Kz_bfrq(:,ii),CTD.de(:,ii)); axis ij;
     hold on
     plot(Kzxx(:,ii),CTD.de(:,ii))
 end
