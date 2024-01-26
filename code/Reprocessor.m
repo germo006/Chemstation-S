@@ -14,77 +14,15 @@ clc
 % I need to add paths to certain data, as well as some scripts and
 % colormaps I will be using. 
 
-addpath("F:\Noah Germolus\Documents\MATLAB\SkyMat")
-addpath("F:\Noah Germolus\Documents\MATLAB\NoahMaps")
-addpath("F:\Noah Germolus\Documents\MATLAB\divaformatlab")
-load("../datasets/AE2123_NPG_curve34.2024.01.08_OneMode.mat")
-load("AlbumMaps.mat", "resilia")
-info=readtable("H:\2022_0214_AE2123_BC\sequence_fromMethods\2022_0212_AE2123_BC_C34.xlsx");
-% NPG 20 Apr 2022 USING BIOS-SCOPE BOTTLE DATA
-% Here's where I will supplement my sInfo variable with data from the CTD
-% rosette. 
-CTD_bottlefile = readtable("../../BATS_BS_COMBINED_MASTER_2022.4.7.xlsx",...
-    "Sheet", "BATS_BS bottle file", "DataRange", 'A14842:EG15082',...
-    "ReadVariableNames", true, "VariableNamesRange", 'A1:EG1');
+dfile = "../datasets/AE2123_NPG_curve34.2024.01.08_OneMode.mat";
+colors = "resilia";
+sfile = "H:\2022_0214_AE2123_BC\sequence_fromMethods\2022_0212_AE2123_BC_C34.xlsx";
+bfile = "../../BATS_BS_COMBINED_MASTER_2022.4.7.xlsx";
+[sInfo, mtabData, LOD, LOQ, mtabNames, resilia, cmap3, var] = loaddata(dfile, colors, sfile, bfile);
 
-delTable = readtable("../datasets/toDelete.xlsx");
-del = logical(delTable.Delete);
+dt = "../datasets/toDelete.xlsx";
+[mtabData, LOD, LOQ, mtabNames, nicenames, baseline, var] = filterdata(dt, LOD, LOQ, mtabData, mtabNames, var);
 
-LOD(del,:)=[];
-LOQ(del,:)=[];
-mtabData(del,:)=[];
-mtabNames(del,:)=[];
-var(del,:)=[];
-delTable(del,:)=[];
-
-belowLOD = mtabData<LOD;
-mtabData(belowLOD) = 0;
-
-% I'm going to try a weird bit of filtering. Some metabolites show a
-% uniform concentration across all samples, what seems to be an error in
-% calibration intercept. 
-mtabData_noBaseline = mtabData;
-mtabData_noBaseline(mtabData_noBaseline==0) = NaN;
-modes = mode(mtabData_noBaseline,2);
-mtabData_noBaseline(mtabData_noBaseline==modes) = NaN;
-mtabData = mtabData_noBaseline;
-
-ifilternan = sum(isnan(mtabData),2)==width(mtabData);
-mtabNames(ifilternan,:)=[];
-LOD(ifilternan,:)=[];
-LOQ(ifilternan,:)=[];
-mtabData(ifilternan,:)=[];
-var(ifilternan,:)=[];
-delTable(ifilternan,:)=[];
-
-[~,iSamples] = ismember(sInfo.FileName_pos, info.FileName);
-sInfo.cast = info.cast(iSamples);
-sInfo.niskin = info.niskin(iSamples);
-sInfo.CN = string(info.CN_num(iSamples));
-sInfo.CTDdepth = info.depth_m(iSamples);
-
-% I'm going to pull info from the bottlefile into the sInfo variable.
-CTD_bottlefile.CN = ["C"+string(CTD_bottlefile.Cast)+"N"+string(CTD_bottlefile.Niskin)];
-[~, Lib] = ismember(sInfo.CN, CTD_bottlefile.CN);
-sInfo.CTDdepth(Lib~=0) = CTD_bottlefile.Depth(Lib(Lib~=0));
-sInfo.timestampdec(Lib~=0) = CTD_bottlefile.decy(Lib(Lib~=0));
-sInfo.timeYYYYmmdd(Lib~=0) = CTD_bottlefile.yyyymmdd(Lib(Lib~=0));
-sInfo.timehhMM(Lib~=0) = CTD_bottlefile.time_UTC_(Lib(Lib~=0));
-sInfo.timestring = string(sInfo.timehhMM);
-sInfo.timestring(sInfo.timehhMM <1000) = "0"+sInfo.timestring(sInfo.timehhMM <1000);
-sInfo.time = string(sInfo.timeYYYYmmdd)+" "+string(sInfo.timestring);
-sInfo.time(Lib~=0) = datenum(sInfo.time(Lib~=0),"yyyymmdd HHMM");
-sInfo.time(Lib==0) = 0; sInfo.time = str2double(sInfo.time);
-
-
-% Setting some color properties
-cmap1 = [linspace(resilia{4}(1), resilia{2}(1), 10)',...
-    linspace(resilia{4}(2), resilia{2}(2), 10)',...
-    linspace(resilia{4}(3),resilia{2}(3), 10)'];
-cmap2 = [linspace(resilia{2}(1), resilia{1}(1), 10)',...
-    linspace(resilia{2}(2), resilia{1}(2), 10)',...
-    linspace(resilia{2}(3), resilia{1}(3), 10)'];
-cmap3 = flip([cmap1;cmap2]);
 
 %% All depth profiles
 if 0
@@ -132,16 +70,59 @@ end
     end
 end
 
-%% Heatmaps, redux. (New MATLAB package.)
+% if 1
+%     saveDir = "../images/profiles/";
+%     if ~exist("saveDir", "dir")
+%         mkdir(saveDir)
+%     end
+%     f = figure;
+%     for ii=2:9
+%         subplot(2,4,ii-1)
+%         for mtab=1:length(mtabNames)
+% 
+%             y = sInfo.CTDdepth(sInfo.cast == ii);
+%             x = mtabData(mtab, sInfo.cast == ii);
+%             x(x==0) = NaN;
+%             G = findgroups(y');
+%             meanRep = splitapply(@nanmean, x, G);
+%             stdRep = splitapply(@nanstd, x, G);
+%             yUnique = unique(y);
+%             if nansum(x > 0) < 3
+%                 message = [mtabNames(mtab)+" has fewer than 3 nonzero data points in cast "+string(ii)+". No graph generated."];
+%                 disp(message)
+%                 continue
+%             end
+%             scatter(100*meanRep/stdRep, yUnique, 'Color', resilia{3}, 'LineWidth', 1.5)
+%             hold on
+%             scatter(x,y, 30, resilia{4},"filled")
+%         end
+%         ax = gca; ax.YDir = "reverse";
+%         ax.XAxisLocation = "top";
+%         ax.Color = resilia{5}; ax.XColor = resilia{1}; ax.YColor = resilia{1};
+%         if ii==2
+%             ax.YLim = [0,1000];
+%         elseif ii==9
+%             ax.YLim = [0,2000];
+%         else
+%             ax.YLim = [0,250];
+%         end
+%         %ax.XLim = [0,nanmax(x)];
+%         ylabel("Depth, m")
+%         xlabel(["Variance, %, C" + string(ii)])
+%     end
+%     filename = saveDir + "VarProfile_C" + string(ii) + ".pdf";
+%     exportgraphics(f, filename, 'ContentType', 'vector', 'BackGroundColor', 'none');
+%     close
+% end
 
 
-
+%% Heatmaps, interpolated visualizations. (Fathom toolbox req'd.)
 
 iwithout6913 = (sInfo.cast > 0 & (sInfo.CN ~= "C6N9" & sInfo.CN ~= "C6N13"));
 
 
 % Run if you don't have interpolated datasets.
-if 1
+if 0
     % I need to make the average replicate values into a sort of grid.
     allx = sInfo.time(sInfo.cast > 0);
     ally = sInfo.CTDdepth(sInfo.cast > 0);
@@ -166,46 +147,26 @@ if 1
     % Next, I'm going to let MATLAB run some of the calcs I had it do in my
     % initial processing script, such as interpolating the metabolites.
     % I need to make the average replicate values into a sort of grid.
-    structNames = strrep(strrep(strrep(strrep(mtabNames," ",...
-        ""),"-",...
-        ""),"'",...
-        ""),",","");
-    interpConcs = struct();
-    % Do a version that doesn't include the C6 anomalies.
-    interpConcs_n6 = struct();
-
     % Set up interpolant grid.
-    xInterp = min(sInfo.time(Lib~=0)):0.01:max(sInfo.time(Lib~=0));
+    xInterp = min(sInfo.time(sInfo.time~=0)):0.01:max(sInfo.time(sInfo.time~=0));
     yInterp = [0:10:200, 250:100:1050];
     [X, Y] = meshgrid(xInterp, yInterp);
     delZ = [10, diff(yInterp)];
     delt = diff(xInterp);
 
-    for mtab=1:length(mtabNames)
-        interpConcs(mtab).Name = mtabNames{mtab};
-        [interpConcs(mtab).C, interpConcs(mtab).E] = divagrid(allx, ally,...
-            mtabData(mtab,sInfo.cast > 0)', X, Y);
-        [interpConcs_n6(mtab).C, interpConcs_n6(mtab).E] = divagrid(allxn6, allyn6,...
-            mtabData(mtab,iwithout6913)', X, Y);
-        diffConc = diff(interpConcs(mtab).C,1,2);
-        diffConc_n6 = diff(interpConcs_n6(mtab).C,1,2);
-        interpConcs(mtab).J = diffConc./delt;
-        interpConcs(mtab).F = sum(interpConcs(mtab).J.*delZ',1).*1000;
-        interpConcs_n6(mtab).J = diffConc_n6./delt;
-        interpConcs_n6(mtab).F = sum(interpConcs_n6(mtab).J.*delZ',1).*1000;
-        % Noah Germolus 23 June 2022, inserting a routine for 1st and
-        % second derivatives wrt depth. 
-        [interpConcs(mtab).d1, interpConcs(mtab).d2] = ...
-            ComputeDerivs(interpConcs(mtab).C, yInterp);
-        [interpConcs_n6(mtab).d1, interpConcs_n6(mtab).d2] = ...
-            ComputeDerivs(interpConcs_n6(mtab).C, yInterp);
-    end
+    interpConcs = interpolator(mtabData(:,sInfo.cast > 0),...
+        mtabNames, X, Y, allx, ally, yInterp);
+    interpConcs_n6 = interpolator(mtabData(:,iwithout6913),...
+        mtabNames, X, Y, allxn6, allyn6, yInterp);
+
     save("../datasets/InterpConcs.mat", "interpConcs_n6", "interpConcs",...
-        "delZ", "delt", "X","Y")
+        "delZ", "delt", "X","Y", "allx", "ally")
+else
+    load("../datasets/InterpConcs.mat")
 end
 
-% Contour plots with data overlay.
-if 0
+%% Contour plots with data overlay.
+if 1
     saveDir = "../images/divamaps/";
     if ~exist("saveDir", "dir")
         mkdir(saveDir)
@@ -253,7 +214,7 @@ if 0
 end
 
 % Same graphs, but this time without the Cast 6 anomalies.
-if 0
+if 1
     saveDir = "../images/divamaps_noC6N9-13/";
     if ~exist("saveDir", "dir")
         mkdir(saveDir)
@@ -358,7 +319,7 @@ yrange = 0:250;
     masterCast.PAR, XRANGE, YRANGE);
 
 %% Using Ruth's parametrization of Kz profiles to get data for the cruise. 
-addpath 'F:\Noah Germolus\Documents\MIT-WHOI\Thesis\FromRuth\00Mfiles\bios'
+addpath 'F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C2\FromRuth\00Mfiles\bios'
 tinynum = 1e-5;
 XX = CTD.bvfrq;
 XX(XX<0) = tinynum; % Use this, for sure. 
@@ -548,3 +509,18 @@ ax.XLim = [min(CTD.mtime), max(CTD.mtime)];
 % doesn't exactly agree with the CTD, and that there's a chunk of missing
 % glider data.
 
+%% Some refinements.
+% Here I want to draft a master-list of good measurements from this
+% project. 
+
+invalid = isnan(mtabData);
+[CNsort, iCN] = sort(sInfo.CN);
+invalid = invalid(:,iCN);
+unCN = unique(CNsort);
+G = findgroups(CNsort);
+sum2 = @(x)sum(x,2);
+valid = double(~invalid);
+validsum = splitapply(sum2, valid, G');
+validTable = array2table(validsum, "VariableNames",unCN);
+validTable.Name = mtabNames;
+validTable.LOD = LOD;
