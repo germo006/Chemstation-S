@@ -1,39 +1,112 @@
 %% Noah Germolus 05 Jan 2024
 % For the sake of being diligent, I am going to reprocess this data from
 % more than two years ago. I will use the modern scripts that our lab uses,
-% and hope that doesn't break stuff. 
-
+% and hope that doesn't break stuff.
+%
 % First, I have to redo the calibration and filtering of the data. This
 % will put the data in line with the formats and standards for the other
-% datasets I will pull in from the two other chapters. 
+% datasets I will pull in from the two other chapters.
 
 clear
 clc
 
-%% Loading...
-% I need to add paths to certain data, as well as some scripts and
-% colormaps I will be using. 
-
-dfile = "../datasets/AE2123_NPG_curve34.2024.01.08_OneMode.mat";
-colors = "resilia";
-sfile = "H:\2022_0214_AE2123_BC\sequence_fromMethods\2022_0212_AE2123_BC_C34.xlsx";
-bfile = "../../BATS_BS_COMBINED_MASTER_2022.4.7.xlsx";
-[sInfo, mtabData, LOD, LOQ, mtabNames, resilia, cmap3, var] = loaddata(dfile, colors, sfile, bfile);
-
-dt = "../datasets/toDelete.xlsx";
-[mtabData, LOD, LOQ, mtabNames, nicenames, baseline, var] = filterdata(dt, LOD, LOQ, mtabData, mtabNames, var);
-
-
-%% All depth profiles
 if 0
-saveDir = "../images/profiles/";
-if ~exist("saveDir", "dir")
-    mkdir(saveDir)
+    % Loading...
+    % I need to add paths to certain data, as well as some scripts and
+    % colormaps I will be using.
+
+    dfile = "../datasets/AE2123_NPG_curve34.2024.01.08_OneMode.mat";
+    colors = "resilia";
+    sfile = "H:\2022_0214_AE2123_BC\sequence_fromMethods\2022_0212_AE2123_BC_C34.xlsx";
+    bfile = "../../BATS_BS_COMBINED_MASTER_2022.4.7.xlsx";
+    [sInfo, mtabData, LOD, LOQ, mtabNames, resilia, cmap3, var] = loaddata(dfile, colors, sfile, bfile);
+
+    dt = "../datasets/toDelete.xlsx";
+    [mtabData, LOD, LOQ, mtabNames, nicenames, baseline, sInfo, var] = filterdata(dt, LOD, LOQ, mtabData, mtabNames, sInfo, var);
+
+
+    %% Manual Curation step
+    % Examining errors in the data to see if any additional samples need to be
+    % erased.
+    idxErr = find(sInfo.ErrorCode);
+    deletesamples = zeros(size(idxErr));
+    for i = 1:length(idxErr)
+        if sInfo.ErrorCode(idxErr(i)) == 1 %Flung from rotor/high-volume loss in late stage
+            % Examine whether signal strength was impacted. There is a
+            % possibility that this just led to more nondetects, but also may
+            % have lost SIL-IS, making that signal more erroneous at smaller
+            % values.
+            trip = getReps(sInfo,mtabData,sInfo.CN(idxErr(i)),1);
+            f = figure("Position",[100 100 2500 1000]);
+            b = bar(categorical(nicenames), trip.mtabData', "black");
+            for j=1:sum(trip.ErrorCode==1)
+                b(j).FaceColor="r";
+            end
+        elseif sInfo.ErrorCode(idxErr(i))==2 %Eluted under vacuum
+            % Examine whether compounds had discrepancies related to a
+            % potential elution isotope effect.
+            trip = getReps(sInfo,mtabData,sInfo.CN(idxErr(i)),1);
+            f = figure("Position",[100 100 2500 1000]);
+            b = bar(categorical(nicenames), trip.mtabData', "black");
+            for j=1:sum(trip.ErrorCode==2)
+                b(j).FaceColor="r";
+            end
+        elseif sInfo.ErrorCode(idxErr(i))==3 %Cross-contamination
+            % Examine if contamination >10%
+            trip = getReps(sInfo,mtabData,sInfo.CN(idxErr(i)),1);
+            contSamp = sInfo.XCs(idxErr(i));
+            compareTo = mtabData(:,sInfo.sID==contSamp);
+            f = figure("Position",[100 100 2500 1000]);
+            b = bar(categorical(nicenames), [trip.mtabData',compareTo], "black");
+            for j=1:sum(trip.ErrorCode==3)
+                b(j).FaceColor="r";
+            end
+            b(4).FaceColor="blue";
+        end
+
+        msg = ["Keep sample BC"+string(sInfo.sID(idxErr(i)))+"?"];
+        % Graphically examine data.
+        answer = questdlg(msg, ...
+            'Keep this sample?', ...
+            "Yes","No","Yes");
+        % Handle response
+        switch answer
+            case 'No'
+                % delete the sample.
+                deletesamples(idxErr==idxErr(i)) = 1;
+            case 'Yes'
+                % keep the sample.
+        end
+        close(f)
+    end
+
+    % Deleting samples later will occur if this voiding of an individual
+    % triplicate leads to an n of 1 or 0 for a triplicate set.
+    deletesamples = idxErr(logical(deletesamples));
+    mtabData(:,deletesamples)=NaN;
+    var(:,deletesamples) = NaN;
+
+    % Last, delete samples that shouldn't be processed, as well as eliminating
+    % triplicates with fewer than two measurements.
+    [fmtabDatamean, fmtabStd, CN, mtabData, LOD, LOQ, mtabNames,nicenames, baseline, var, sInfo] = filtersamples(mtabData, sInfo, LOD, LOQ, mtabNames,nicenames, var, baseline);
+
+    clear f compareTo contSamp idxErr trip msg i j b deletesamples
+    save("../datasets/AE2123_NPG_curve34.2024.01.07_OneMode_Filtered.mat")
+
+else
+    %% Start here if you already did the filtering
+    load("../datasets/AE2123_NPG_curve34.2024.01.07_OneMode_Filtered.mat")
 end
+%% All depth profiles
+if 1
+    saveDir = "../images/profiles/";
+    if ~exist("saveDir", "dir")
+        mkdir(saveDir)
+    end
     for ii=2:9
-        
+
         for mtab=1:length(mtabNames)
-            
+
             y = sInfo.CTDdepth(sInfo.cast == ii);
             x = mtabData(mtab, sInfo.cast == ii);
             x(x==0) = NaN;
@@ -79,7 +152,7 @@ end
 %     for ii=2:9
 %         subplot(2,4,ii-1)
 %         for mtab=1:length(mtabNames)
-% 
+%
 %             y = sInfo.CTDdepth(sInfo.cast == ii);
 %             x = mtabData(mtab, sInfo.cast == ii);
 %             x(x==0) = NaN;
@@ -119,30 +192,30 @@ end
 %% Heatmaps, interpolated visualizations. (Fathom toolbox req'd.)
 
 iwithout6913 = (sInfo.cast > 0 & (sInfo.CN ~= "C6N9" & sInfo.CN ~= "C6N13"));
-
+allCN = sInfo.CN(sInfo.cast > 0);
+G = findgroups(allCN);
+mtabdataMeans = splitapply(@nanmean, mtabData(:,sInfo.cast > 0)', G)';
+mtabdataStds = splitapply(@nanstd, mtabData(:,sInfo.cast > 0)', G)';
+mtabdataCV = mtabdataStds./mtabdataMeans;
+allCNn6 = sInfo.CN(iwithout6913);
+Gn6 = findgroups(allCNn6);
+mtabdataMeansn6 = splitapply(@nanmean, mtabData(:,iwithout6913)', Gn6)';
+mtabdataStdsn6 = splitapply(@nanstd, mtabData(:,iwithout6913)', Gn6)';
+mtabdataCVn6 = mtabdataStdsn6./mtabdataMeansn6;
 
 % Run if you don't have interpolated datasets.
-if 0
+if 1
     % I need to make the average replicate values into a sort of grid.
     allx = sInfo.time(sInfo.cast > 0);
     ally = sInfo.CTDdepth(sInfo.cast > 0);
-    allCN = sInfo.CN(sInfo.cast > 0);
-    G = findgroups(allCN);
     x = splitapply(@mean, allx, G);
     y = splitapply(@mean, ally, G);
-    mtabdataMeans = splitapply(@nanmean, mtabData(:,sInfo.cast > 0)', G)';
-    mtabdataStds = splitapply(@nanstd, mtabData(:,sInfo.cast > 0)', G)';
-    mtabdataCV = mtabdataStds./mtabdataMeans;
+
     % Same but no cast 6 anomalies.
     allxn6 = sInfo.time(iwithout6913);
     allyn6 = sInfo.CTDdepth(iwithout6913);
-    allCNn6 = sInfo.CN(iwithout6913);
-    Gn6 = findgroups(allCNn6);
     xn6 = splitapply(@mean, allxn6, Gn6);
     yn6 = splitapply(@mean, allyn6, Gn6);
-    mtabdataMeansn6 = splitapply(@nanmean, mtabData(:,iwithout6913)', Gn6)';
-    mtabdataStdsn6 = splitapply(@nanstd, mtabData(:,iwithout6913)', Gn6)';
-    mtabdataCVn6 = mtabdataStdsn6./mtabdataMeansn6;
 
     % Next, I'm going to let MATLAB run some of the calcs I had it do in my
     % initial processing script, such as interpolating the metabolites.
@@ -211,10 +284,9 @@ if 1
         exportgraphics(f, filename, 'ContentType', 'vector', 'BackGroundColor', 'none');
         close
     end
-end
 
-% Same graphs, but this time without the Cast 6 anomalies.
-if 1
+    % Same graphs, but this time without the Cast 6 anomalies.
+
     saveDir = "../images/divamaps_noC6N9-13/";
     if ~exist("saveDir", "dir")
         mkdir(saveDir)
@@ -274,15 +346,15 @@ relConcs_c6 = relConcs(:,[iC6N9;iC6N13]);
 sInfo_n6 = sInfo;
 sInfo_n6([iC6N9;iC6N13],:) = [];
 relConcs_n6 = relConcs; relConcs_n6(:,[iC6N9;iC6N13]) = [];
-
-relconcs_flag = relConcs_c6>3;
-relconcs_flag9 = sum(relconcs_flag(:,1:3),2);
-relconcs_flag13 = sum(relconcs_flag(:,4:6),2);
-HighNames = mtabNames(relconcs_flag13 >=2);
-mtab_C6N13 = mtabData(relconcs_flag13>=2,iC6N13);
+% 
+% relconcs_flag = relConcs_c6>3;
+% relconcs_flag9 = sum(relconcs_flag(:,1:3),2);
+% relconcs_flag13 = sum(relconcs_flag(:,4:6),2);
+% HighNames = mtabNames(relconcs_flag13 >=2);
+% mtab_C6N13 = mtabData(relconcs_flag13>=2,iC6N13);
 
 %% Load in cast files and glider data. 
-% This file has data and code from Ruth Curry for glider stuff (Kz)
+% This file has data and code from Ruth Curry for glider/CTD/wind stuff (Kz)
 addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C2\FromRuth/00Mfiles")
 addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C2\FromRuth/00Mfiles/bios")
 load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C2/FromRuth/00CTD/20211110_92123_CTD.mat")
@@ -321,10 +393,10 @@ yrange = 0:250;
 %% Using Ruth's parametrization of Kz profiles to get data for the cruise. 
 addpath 'F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C2\FromRuth\00Mfiles\bios'
 tinynum = 1e-5;
-XX = CTD.bvfrq;
-XX(XX<0) = tinynum; % Use this, for sure. 
-Kz_bfrq_xx = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, XX, CTD.de);
-Kz_bfrq = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, CTD.bvfrq, CTD.de);
+posbvfrq = CTD.bvfrq;
+posbvfrq(posbvfrq<0) = tinynum; % Use this, for sure. 
+Kz_bfrq = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, posbvfrq, CTD.de);
+%Kz_bfrq = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, CTD.bvfrq, CTD.de);
 % Kz_dens125 = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_dens125, CTD.rho, CTD.bvfrq, CTD.de);
 % Kz_T2 = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_densT2, CTD.rho, CTD.bvfrq, CTD.de);
 % CTD.bvfilt = 10.^get_bvfilt(log10(CTD.bvfrq), 5);
@@ -332,24 +404,21 @@ Kz_bfrq = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, CTD.bvfrq, CTD.d
 % Use nonnegative bvfrq values, but do not apply the butterworth filter
 % before calculating Kz. Then apply the filter to Kz. 
 
-[Kzxx,Epxx,W10xx] = Kz_profile_param(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, XX, CTD.de, Kz_bfrq_xx);
+[Kz,Ep,W10] = Kz_profile_param(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, posbvfrq, CTD.de, Kz_bfrq);
 %[Kz,Ep,W10] = Kz_profile_param(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, CTD.bvfrq, CTD.de, Kz_bfrq);
-[Kzfilt] = get_Kvfilt(Kzxx,3); % Evaluate between filtered and unfiltered
+[Kzfilt] = get_Kvfilt(Kz,3); % Evaluate between filtered and unfiltered
 %vals. 
 
-
-
+% Below are the remnants of an earlier approach to modeling vertical
+% diffusion. 
 % I would like to interpolate this to the metabolite grid, but for such a
 % nonlinear variable, is this okay? 
-
 % The following gives me a rough exponential profile of Kz in the mixed
 % layer and sets it at 10e-5 below
-
 % Kz_rough = zeros(length(Y(:,1)), length(CTD.MLD_bvfrq));
 % for ii=1:length(CTD.MLD_bvfrq)
 %     Kz_rough(:,ii) = Kz_fake(CTD.MLD_bvfrq(ii), Y(:,1));
 % end
-
 % The profiles of dC/dt = d/dz(Kz(z)dC/dz) are calculated below. 
 % Because the profiles of Kz are discrete from casts, I'm actually going to
 % average them, then repeat that for as many points as there are
@@ -362,19 +431,20 @@ Kz_bfrq = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, CTD.bvfrq, CTD.d
 % Kz_CV = Kz_var./Kz_ave;
 % Okay, a 96% CV near the bottom of the ML seems pretty bad, and I guess
 % that makes sense given that we're dealing with orders of magnitude. 
-
 % Try starting with just the profiles rather than an interpolated grid,
 % then move onward.
-[interpKz, errorKz] = divagrid(repmat(CTD.mtime,2500,1), CTD.de, ...
-    Kzfilt, X, Y);
-for mtab=1:length(mtabNames)
-    [interpConcs(mtab).KzFlux, ~] = ...
-        ComputeDerivs(interpKz.*interpConcs(mtab).d1, yInterp);
-    % Now convert to pM/day
-    interpConcs(mtab).KzFlux = 24*60*60*interpConcs(mtab).KzFlux;
-    % Treating each point as a box and computing the net result.
-    interpConcs(mtab).NetVFlux = diff(interpConcs(mtab).KzFlux,1,1);
-end
+% [interpKz, errorKz] = divagrid(repmat(CTD.mtime,2500,1), CTD.de, ...
+%     Kzfilt, X, Y);
+% This is a sloppy, difference-based assessment of verical fluxes that
+% doesn't do justice to the gradient approach. 
+% for mtab=1:length(mtabNames)
+%     [interpConcs(mtab).KzFlux, ~] = ...
+%         ComputeDerivs(interpKz.*interpConcs(mtab).d1, yInterp);
+%     % Now convert to pM/day
+%     interpConcs(mtab).KzFlux = 24*60*60*interpConcs(mtab).KzFlux;
+%     % Treating each point as a box and computing the net result.
+%     interpConcs(mtab).NetVFlux = diff(interpConcs(mtab).KzFlux,1,1);
+% end
 
 %% Evaluating a pulse input through forward modeling. 
 
@@ -509,18 +579,3 @@ ax.XLim = [min(CTD.mtime), max(CTD.mtime)];
 % doesn't exactly agree with the CTD, and that there's a chunk of missing
 % glider data.
 
-%% Some refinements.
-% Here I want to draft a master-list of good measurements from this
-% project. 
-
-invalid = isnan(mtabData);
-[CNsort, iCN] = sort(sInfo.CN);
-invalid = invalid(:,iCN);
-unCN = unique(CNsort);
-G = findgroups(CNsort);
-sum2 = @(x)sum(x,2);
-valid = double(~invalid);
-validsum = splitapply(sum2, valid, G');
-validTable = array2table(validsum, "VariableNames",unCN);
-validTable.Name = mtabNames;
-validTable.LOD = LOD;

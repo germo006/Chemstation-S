@@ -1,4 +1,4 @@
-function [mtabData, LOD, LOQ, mtabNames, nicenames, baseline, var] = filterdata(dt, LOD, LOQ, mtabData, mtabNames, var)
+function [mtabData, LOD, LOQ, mtabNames, nicenames, baseline, sInfo, var] = filterdata(dt, LOD, LOQ, mtabData, mtabNames, sInfo, var)
 %FILTERDATA...filters data. After all the initial processing steps, things
 %still arnen't perfect. I will explain this one as I go along. 
 
@@ -12,7 +12,7 @@ function [mtabData, LOD, LOQ, mtabNames, nicenames, baseline, var] = filterdata(
 % processing. This is manually evaluated based on LCMS peaks. 
 % 2: A column of cleaned names. This is just something that will be nice
 % for 
-delTable = readtable("../datasets/toDelete.xlsx");
+delTable = readtable(dt);
 del = logical(delTable.Delete);
 nicenames = delTable.nicename;
 
@@ -23,11 +23,13 @@ nicenames = delTable.nicename;
 % I'm going to try a weird bit of filtering. Some metabolites show a
 % uniform concentration across all samples, what seems to be an error in
 % calibration intercept. 
+% This will also eliminate anything lower than the process blank sample.
 mtabData_noBaseline = mtabData;
 mtabData_noBaseline(mtabData_noBaseline==0) = NaN;
 modes = mode(mtabData_noBaseline,2);
+pbk = mtabData(:,sInfo.CN=="C0N0");
 baseline = modes;
-mtabData_noBaseline(mtabData_noBaseline==modes) = NaN;
+mtabData_noBaseline(mtabData_noBaseline==modes | mtabData_noBaseline<= pbk) = NaN;
 mtabData = mtabData_noBaseline;
 
 %% Second Deletion
@@ -35,8 +37,6 @@ mtabData = mtabData_noBaseline;
 % eliminate it. 
 ifilternan = sum(isnan(mtabData),2)==width(mtabData);
 [mtabData, LOD, LOQ, mtabNames, nicenames, var, delTable, baseline] = delrows(ifilternan, mtabData, LOD, LOQ, mtabNames, nicenames, var, delTable, baseline);
-
-
 
 end
 
