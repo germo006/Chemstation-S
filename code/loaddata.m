@@ -34,11 +34,12 @@ sInfo.XCs = info.Xcnum(iSamples);
 CTD_bottlefile.CN = ["C"+string(CTD_bottlefile.Cast)+"N"+string(CTD_bottlefile.Niskin)];
 [~, Lib] = ismember(sInfo.CN, CTD_bottlefile.CN);
 sInfo.CTDdepth(Lib~=0) = CTD_bottlefile.Depth(Lib(Lib~=0));
-sInfo.timestampdec(Lib~=0) = CTD_bottlefile.decy(Lib(Lib~=0));
+sInfo.timestampdec(Lib~=0) = CTD_bottlefile.decy(Lib(Lib~=0)); %This isn't converted to local time but is never used
 sInfo.timeYYYYmmdd(Lib~=0) = CTD_bottlefile.yyyymmdd(Lib(Lib~=0));
-sInfo.timehhMM(Lib~=0) = CTD_bottlefile.time_UTC_(Lib(Lib~=0));
+sInfo.timehhMM(Lib~=0) = CTD_bottlefile.time_UTC_(Lib(Lib~=0))-400; % convert UTC to local time
 sInfo.timestring = string(sInfo.timehhMM);
 sInfo.timestring(sInfo.timehhMM <1000) = "0"+sInfo.timestring(sInfo.timehhMM <1000);
+sInfo.timestring(sInfo.timehhMM <100) = "0"+sInfo.timestring(sInfo.timehhMM <100);
 sInfo.time = string(sInfo.timeYYYYmmdd)+" "+string(sInfo.timestring);
 sInfo.time(Lib~=0) = datenum(sInfo.time(Lib~=0),"yyyymmdd HHMM");
 sInfo.time(Lib==0) = 0; sInfo.time = str2double(sInfo.time);

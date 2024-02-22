@@ -4,28 +4,28 @@
 % and hope that doesn't break stuff.
 %
 % First, I have to redo the calibration and filtering of the data. This
-% will put the data in line with the formats and standards for the other
+% will put the data in line witiah the formats and standards for the other
 % datasets I will pull in from the two other chapters.
 
 clear
 clc
-
+% Loading...
+% I need to add paths to certain data, as well as some scripts and
+% colormaps I will be using.
 if 0
-    % Loading...
-    % I need to add paths to certain data, as well as some scripts and
-    % colormaps I will be using.
+
 
     dfile = "../datasets/AE2123_NPG_curve34.2024.01.08_OneMode.mat";
-    colors = "resilia";
+    colors = "soft";
     sfile = "H:\2022_0214_AE2123_BC\sequence_fromMethods\2022_0212_AE2123_BC_C34.xlsx";
     bfile = "../../BATS_BS_COMBINED_MASTER_2022.4.7.xlsx";
-    [sInfo, mtabData, LOD, LOQ, mtabNames, resilia, cmap3, var] = loaddata(dfile, colors, sfile, bfile);
+    [sInfo, mtabData, LOD, LOQ, mtabNames, soft, cmap3, var] = loaddata(dfile, colors, sfile, bfile);
 
     dt = "../datasets/toDelete.xlsx";
     [mtabData, LOD, LOQ, mtabNames, nicenames, baseline, sInfo, var] = filterdata(dt, LOD, LOQ, mtabData, mtabNames, sInfo, var);
 
 
-    %% Manual Curation step
+    % Manual Curation step
     % Examining errors in the data to see if any additional samples need to be
     % erased.
     idxErr = find(sInfo.ErrorCode);
@@ -94,11 +94,11 @@ if 0
     save("../datasets/AE2123_NPG_curve34.2024.01.07_OneMode_Filtered.mat")
 
 else
-    %% Start here if you already did the filtering
+    % Start here if you already did the filtering
     load("../datasets/AE2123_NPG_curve34.2024.01.07_OneMode_Filtered.mat")
 end
 %% All depth profiles
-if 1
+if 0
     saveDir = "../images/profiles/";
     if ~exist("saveDir", "dir")
         mkdir(saveDir)
@@ -114,18 +114,18 @@ if 1
             meanRep = splitapply(@nanmean, x, G);
             stdRep = splitapply(@nanstd, x, G);
             yUnique = unique(y);
-            if nansum(x > 0) < 3
+            if sum(x > 0, "omitmissing") < 3
                 message = [mtabNames(mtab)+" has fewer than 3 nonzero data points in cast "+string(ii)+". No graph generated."];
                 disp(message)
                 continue
             end
-            f = figure('Visible', 'off');
-            errorbar(meanRep, yUnique, [], [], stdRep, stdRep, 'Color', resilia{3}, 'LineWidth', 1.5)
+            f = figure('Visible', 'off', "Color","none");
+            errorbar(meanRep, yUnique, [], [], stdRep, stdRep, 'Color', soft{1}, 'LineWidth', 1.5)
             hold on
-            scatter(x,y, 30, resilia{4},"filled")
+            scatter(x,y, 30, soft{2},"filled")
             ax = gca; ax.YDir = "reverse";
             ax.XAxisLocation = "top";
-            ax.Color = resilia{5}; ax.XColor = resilia{1}; ax.YColor = resilia{1};
+            ax.Color = "none"; ax.XColor = soft{3}; ax.YColor = soft{3};
             if ii==2
                 ax.YLim = [0,1000];
             elseif ii==9
@@ -136,8 +136,8 @@ if 1
             ax.XLim = [0,nanmax(x)];
             ylabel("Depth, m")
             xlabel([mtabNames(mtab)+", pM \pm\sigma, C" + string(ii)])
-            filename = saveDir + mtabNames(mtab) + " C" + string(ii) + ".pdf";
-            exportgraphics(f, filename, 'ContentType', 'vector', 'BackGroundColor', 'none');
+            filename = saveDir + mtabNames(mtab) + " C" + string(ii) + ".eps";
+            exportgraphics(f, filename,"BackgroundColor", 'none');
             close
         end
     end
@@ -165,13 +165,13 @@ end
 %                 disp(message)
 %                 continue
 %             end
-%             scatter(100*meanRep/stdRep, yUnique, 'Color', resilia{3}, 'LineWidth', 1.5)
+%             scatter(100*meanRep/stdRep, yUnique, 'Color', soft{3}, 'LineWidth', 1.5)
 %             hold on
-%             scatter(x,y, 30, resilia{4},"filled")
+%             scatter(x,y, 30, soft{4},"filled")
 %         end
 %         ax = gca; ax.YDir = "reverse";
 %         ax.XAxisLocation = "top";
-%         ax.Color = resilia{5}; ax.XColor = resilia{1}; ax.YColor = resilia{1};
+%         ax.Color = soft{5}; ax.XColor = soft{1}; ax.YColor = soft{1};
 %         if ii==2
 %             ax.YLim = [0,1000];
 %         elseif ii==9
@@ -204,7 +204,7 @@ mtabdataStdsn6 = splitapply(@nanstd, mtabData(:,iwithout6913)', Gn6)';
 mtabdataCVn6 = mtabdataStdsn6./mtabdataMeansn6;
 
 % Run if you don't have interpolated datasets.
-if 1
+if 0
     % I need to make the average replicate values into a sort of grid.
     allx = sInfo.time(sInfo.cast > 0);
     ally = sInfo.CTDdepth(sInfo.cast > 0);
@@ -233,13 +233,13 @@ if 1
         mtabNames, X, Y, allxn6, allyn6, yInterp);
 
     save("../datasets/InterpConcs.mat", "interpConcs_n6", "interpConcs",...
-        "delZ", "delt", "X","Y", "allx", "ally")
+        "delZ", "delt", "X","Y", "allx", "ally", "x", "y")
 else
     load("../datasets/InterpConcs.mat")
 end
 
 %% Contour plots with data overlay.
-if 1
+if 2
     saveDir = "../images/divamaps/";
     if ~exist("saveDir", "dir")
         mkdir(saveDir)
@@ -285,52 +285,52 @@ if 1
         close
     end
 
-    % Same graphs, but this time without the Cast 6 anomalies.
-
-    saveDir = "../images/divamaps_noC6N9-13/";
-    if ~exist("saveDir", "dir")
-        mkdir(saveDir)
-    end
-    for mtab=1:length(mtabNames)
-        interpConc = interpConcs_n6(mtab).C;
-        errorConc = interpConcs_n6(mtab).E;
-        f = figure('Visible', 'off');
-        subplot(1,2,1)
-        filename = saveDir + mtabNames(mtab) + ".png";
-        contourf(X, Y, interpConc)
-        xlabel("Date"); ylabel("Depth, m");
-        xlim([min(allx), max(allx)]); ylim([0,250]);
-        c = colorbar; c.Label.String = "[mtab], pM";
-        title(mtabNames(mtab))
-        ax = gca; ax.YDir = "reverse";
-        ax.XAxisLocation = "top";
-        datetick("x")
-        hold on
-        scatter(x(~isnan(mtabdataMeans(mtab,:)')), y(~isnan(mtabdataMeans(mtab,:)')), 25, mtabdataMeans(mtab,~isnan(mtabdataMeans(mtab,:)'))', "filled", "MarkerEdgeColor", "k")
-        set(ax, "ColorScale", "linear", "Colormap", cmap3)
-        if ax.CLim(2)<LOD(mtab)
-            close
-            disp([mtabNames(mtab)+" has an LOD above the max values."])
-            continue
-        else
-            clim([LOD(mtab),ax.CLim(2)])
-        end
-
-        subplot(1,2,2)
-        contourf(X, Y, errorConc)
-        xlabel("Date");
-        xlim([min(allx), max(allx)]); ylim([0,250]);
-        c = colorbar; c.Label.String = "CV,%";
-        ax = gca; ax.YDir = "reverse";
-        ax.XAxisLocation = "top";
-        datetick("x")
-        set(ax, "ColorScale", "linear", "Colormap", cmap3)
-        hold on
-        scatter(x, y, 25, 100.*mtabdataCV(mtab,:)', "filled", "MarkerEdgeColor", "k")
-        saveas(f, filename)
-        exportgraphics(f, filename, 'ContentType', 'vector', 'BackGroundColor', 'none');
-        close
-    end
+    % % Same graphs, but this time without the Cast 6 anomalies.
+    % 
+    % saveDir = "../images/divamaps_noC6N9-13/";
+    % if ~exist("saveDir", "dir")
+    %     mkdir(saveDir)
+    % end
+    % for mtab=1:length(mtabNames)
+    %     interpConc = interpConcs_n6(mtab).C;
+    %     errorConc = interpConcs_n6(mtab).E;
+    %     f = figure('Visible', 'off');
+    %     subplot(1,2,1)
+    %     filename = saveDir + mtabNames(mtab) + ".png";
+    %     contourf(X, Y, interpConc)
+    %     xlabel("Date"); ylabel("Depth, m");
+    %     xlim([min(allx), max(allx)]); ylim([0,250]);
+    %     c = colorbar; c.Label.String = "[mtab], pM";
+    %     title(mtabNames(mtab))
+    %     ax = gca; ax.YDir = "reverse";
+    %     ax.XAxisLocation = "top";
+    %     datetick("x")
+    %     hold on
+    %     scatter(x(~isnan(mtabdataMeans(mtab,:)')), y(~isnan(mtabdataMeans(mtab,:)')), 25, mtabdataMeans(mtab,~isnan(mtabdataMeans(mtab,:)'))', "filled", "MarkerEdgeColor", "k")
+    %     set(ax, "ColorScale", "linear", "Colormap", cmap3)
+    %     if ax.CLim(2)<LOD(mtab)
+    %         close
+    %         disp([mtabNames(mtab)+" has an LOD above the max values."])
+    %         continue
+    %     else
+    %         clim([LOD(mtab),ax.CLim(2)])
+    %     end
+    % 
+    %     subplot(1,2,2)
+    %     contourf(X, Y, errorConc)
+    %     xlabel("Date");
+    %     xlim([min(allx), max(allx)]); ylim([0,250]);
+    %     c = colorbar; c.Label.String = "CV,%";
+    %     ax = gca; ax.YDir = "reverse";
+    %     ax.XAxisLocation = "top";
+    %     datetick("x")
+    %     set(ax, "ColorScale", "linear", "Colormap", cmap3)
+    %     hold on
+    %     scatter(x, y, 25, 100.*mtabdataCV(mtab,:)', "filled", "MarkerEdgeColor", "k")
+    %     saveas(f, filename)
+    %     exportgraphics(f, filename, 'ContentType', 'vector', 'BackGroundColor', 'none');
+    %     close
+    % end
 end
 
 %% Compare metabolites ballooning in cast 6
@@ -346,20 +346,20 @@ relConcs_c6 = relConcs(:,[iC6N9;iC6N13]);
 sInfo_n6 = sInfo;
 sInfo_n6([iC6N9;iC6N13],:) = [];
 relConcs_n6 = relConcs; relConcs_n6(:,[iC6N9;iC6N13]) = [];
-% 
-% relconcs_flag = relConcs_c6>3;
+
+relconcs_flag = relConcs_c6>3;
 % relconcs_flag9 = sum(relconcs_flag(:,1:3),2);
-% relconcs_flag13 = sum(relconcs_flag(:,4:6),2);
-% HighNames = mtabNames(relconcs_flag13 >=2);
-% mtab_C6N13 = mtabData(relconcs_flag13>=2,iC6N13);
+relconcs_flag13 = sum(relconcs_flag,2);
+HighNames = mtabNames(relconcs_flag13 >=2);
+mtab_C6N13 = mtabData(relconcs_flag13>=2,iC6N13);
 
 %% Load in cast files and glider data. 
 % This file has data and code from Ruth Curry for glider/CTD/wind stuff (Kz)
-addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C2\FromRuth/00Mfiles")
-addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C2\FromRuth/00Mfiles/bios")
-load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C2/FromRuth/00CTD/20211110_92123_CTD.mat")
-load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C2/FromRuth/00Wind/ERA5_2017-2021.mat")
-load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C2/FromRuth/00Glider/MISSIONS_BPE2021.mat")
+addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C4 Field Data\FromRuth/00Mfiles")
+addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C4 Field Data\FromRuth/00Mfiles/bios")
+load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C4 Field Data/FromRuth/00CTD/20211110_92123_CTD.mat")
+load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C4 Field Data/FromRuth/00Wind/ERA5_2017-2021.mat")
+load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C4 Field Data/FromRuth/00Glider/MISSIONS_BPE2021.mat")
 % Now that I've gridded mtabs, I am also going to load-in individual CTD cast
 % files and concatenate them so that I can have high-resolution data for
 % PAR, among other things. 
@@ -376,7 +376,7 @@ for cast = 1:length(castfiles)
 end
 %masterCast.timestampdec = masterCast.decy;
 masterCast.timeYYYYmmdd = masterCast.yyyymmdd;
-masterCast.timehhMM = masterCast.hhmm;
+masterCast.timehhMM = masterCast.hhmm - 400; % Convert UTC to local
 masterCast.timestring = string(masterCast.hhmm);
 masterCast.timestring(masterCast.hhmm <1000) = "0"+masterCast.timestring(masterCast.hhmm <1000);
 masterCast.time = string(masterCast.yyyymmdd)+" "+string(masterCast.timestring);
@@ -391,7 +391,7 @@ yrange = 0:250;
     masterCast.PAR, XRANGE, YRANGE);
 
 %% Using Ruth's parametrization of Kz profiles to get data for the cruise. 
-addpath 'F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C2\FromRuth\00Mfiles\bios'
+addpath 'F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C4 Field Data\FromRuth\00Mfiles\bios'
 tinynum = 1e-5;
 posbvfrq = CTD.bvfrq;
 posbvfrq(posbvfrq<0) = tinynum; % Use this, for sure. 
@@ -535,9 +535,9 @@ for ii=1:length(HighNames)
 
     subplot(3,1,3)
     p = plot(tsol,Cfield(:,find(C0 == max(C0)))'./1000);
-    p.LineWidth = 2; p.Color = resilia{1};
+    p.LineWidth = 2; p.Color = soft{1};
     hold on
-    sc = scatter(xpts,datapts(ii,:),30,"filled","o", "MarkerFaceColor", resilia{2});
+    sc = scatter(xpts,datapts(ii,:),30,"filled","o", "MarkerFaceColor", soft{2});
     ylabel(["Conc at " + string(zInt(C0 == max(C0))) + " m (pM)"])
     xlabel("time (h)")
     legend({"Modeled Concentration w/Mixing", "Measured Concentrations"})
