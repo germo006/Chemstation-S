@@ -96,6 +96,7 @@ if 0
 else
     % Start here if you already did the filtering
     load("../datasets/AE2123_NPG_curve34.2024.01.07_OneMode_Filtered.mat")
+    nicenames = string(nicenames);
 end
 %% All depth profiles
 if 0
@@ -239,7 +240,7 @@ else
 end
 
 %% Contour plots with data overlay.
-if 2
+if 0
     saveDir = "../images/divamaps/";
     if ~exist("saveDir", "dir")
         mkdir(saveDir)
@@ -350,14 +351,17 @@ relConcs_n6 = relConcs; relConcs_n6(:,[iC6N9;iC6N13]) = [];
 relconcs_flag = relConcs_c6>3;
 % relconcs_flag9 = sum(relconcs_flag(:,1:3),2);
 relconcs_flag13 = sum(relconcs_flag,2);
-HighNames = mtabNames(relconcs_flag13 >=2);
+HighNames = nicenames(relconcs_flag13 >=2);
 mtab_C6N13 = mtabData(relconcs_flag13>=2,iC6N13);
 
 %% Load in cast files and glider data. 
 % This file has data and code from Ruth Curry for glider/CTD/wind stuff (Kz)
 addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C4 Field Data\FromRuth/00Mfiles")
 addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C4 Field Data\FromRuth/00Mfiles/bios")
+addpath("F:\Noah Germolus\Documents\MATLAB\divaformatlab")
 load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C4 Field Data/FromRuth/00CTD/20211110_92123_CTD.mat")
+CTD.mtime = datetime(CTD.mtime, "ConvertFrom", "datenum")-duration(4,0,0);
+CTD.mtimed = datenum(CTD.mtime);
 load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C4 Field Data/FromRuth/00Wind/ERA5_2017-2021.mat")
 load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C4 Field Data/FromRuth/00Glider/MISSIONS_BPE2021.mat")
 % Now that I've gridded mtabs, I am also going to load-in individual CTD cast
@@ -395,8 +399,8 @@ addpath 'F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C4 Field Data\FromRuth\00Mfi
 tinynum = 1e-5;
 posbvfrq = CTD.bvfrq;
 posbvfrq(posbvfrq<0) = tinynum; % Use this, for sure. 
-Kz_bfrq = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, posbvfrq, CTD.de);
-%Kz_bfrq = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, CTD.bvfrq, CTD.de);
+Kz_bfrq = Kz_from_wind(ERA5, CTD.mtimed, CTD.MLD_bvfrq, CTD.rho, posbvfrq, CTD.de);
+%Kz_bfrq = Kz_from_wind(ERA5, CTD.mtimed, CTD.MLD_bvfrq, CTD.rho, CTD.bvfrq, CTD.de);
 % Kz_dens125 = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_dens125, CTD.rho, CTD.bvfrq, CTD.de);
 % Kz_T2 = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_densT2, CTD.rho, CTD.bvfrq, CTD.de);
 % CTD.bvfilt = 10.^get_bvfilt(log10(CTD.bvfrq), 5);
@@ -404,47 +408,10 @@ Kz_bfrq = Kz_from_wind(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, posbvfrq, CTD.de
 % Use nonnegative bvfrq values, but do not apply the butterworth filter
 % before calculating Kz. Then apply the filter to Kz. 
 
-[Kz,Ep,W10] = Kz_profile_param(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, posbvfrq, CTD.de, Kz_bfrq);
-%[Kz,Ep,W10] = Kz_profile_param(ERA5, CTD.mtime, CTD.MLD_bvfrq, CTD.rho, CTD.bvfrq, CTD.de, Kz_bfrq);
+[Kz,Ep,W10] = Kz_profile_param(ERA5, CTD.mtimed, CTD.MLD_bvfrq, CTD.rho, posbvfrq, CTD.de, Kz_bfrq);
+%[Kz,Ep,W10] = Kz_profile_param(ERA5, CTD.mtimed, CTD.MLD_bvfrq, CTD.rho, CTD.bvfrq, CTD.de, Kz_bfrq);
 [Kzfilt] = get_Kvfilt(Kz,3); % Evaluate between filtered and unfiltered
 %vals. 
-
-% Below are the remnants of an earlier approach to modeling vertical
-% diffusion. 
-% I would like to interpolate this to the metabolite grid, but for such a
-% nonlinear variable, is this okay? 
-% The following gives me a rough exponential profile of Kz in the mixed
-% layer and sets it at 10e-5 below
-% Kz_rough = zeros(length(Y(:,1)), length(CTD.MLD_bvfrq));
-% for ii=1:length(CTD.MLD_bvfrq)
-%     Kz_rough(:,ii) = Kz_fake(CTD.MLD_bvfrq(ii), Y(:,1));
-% end
-% The profiles of dC/dt = d/dz(Kz(z)dC/dz) are calculated below. 
-% Because the profiles of Kz are discrete from casts, I'm actually going to
-% average them, then repeat that for as many points as there are
-% interpolated mtabs
-% 
-% Kz_ave = mean(Kz_rough, 2);
-% Kz_var = std(Kz_rough, [], 2);
-% Kz_ave = repmat(Kz_ave, 1, size(Y, 2));
-% Kz_var = repmat(Kz_var, 1, size(Y, 2));
-% Kz_CV = Kz_var./Kz_ave;
-% Okay, a 96% CV near the bottom of the ML seems pretty bad, and I guess
-% that makes sense given that we're dealing with orders of magnitude. 
-% Try starting with just the profiles rather than an interpolated grid,
-% then move onward.
-% [interpKz, errorKz] = divagrid(repmat(CTD.mtime,2500,1), CTD.de, ...
-%     Kzfilt, X, Y);
-% This is a sloppy, difference-based assessment of verical fluxes that
-% doesn't do justice to the gradient approach. 
-% for mtab=1:length(mtabNames)
-%     [interpConcs(mtab).KzFlux, ~] = ...
-%         ComputeDerivs(interpKz.*interpConcs(mtab).d1, yInterp);
-%     % Now convert to pM/day
-%     interpConcs(mtab).KzFlux = 24*60*60*interpConcs(mtab).KzFlux;
-%     % Treating each point as a box and computing the net result.
-%     interpConcs(mtab).NetVFlux = diff(interpConcs(mtab).KzFlux,1,1);
-% end
 
 %% Evaluating a pulse input through forward modeling. 
 
@@ -457,114 +424,137 @@ dummyKz = 0; % Do we want to test using a uniform field of the maximum
 % 0 = no
 % 1 = use average Kz
 % 2 = use max Kz
-npts = 10000; % Number of time-points between cast 6 and 7 to integrate.
+npts = 1000; % Number of time-points between cast 6 and 7 to integrate.
+zb = 15; % Thickness of the integration layer in meters, real value is twice this: symmetrical.
+zg = 10; % gradient steepness, must be between 1m and zb. Equal to half the pulse width at half the pulse magnitude.
+zm = 25; % location of pulse center
 
-saveDir = "../images/FluxMaps/";
+saveDir = ["../images/FluxMaps/"+string(zg)+" m gradient/"];
+if dummyKz==1
+    saveDir = [saveDir+ "MeanKz/"];
+elseif dummyKz ==2
+    saveDir = [saveDir+ "MaxKz/"];
+elseif dummyKz==0 && zm<100
+    saveDir = [saveDir+ "SurfKz/"];
+end
 if ~exist("saveDir", "dir")
     mkdir(saveDir)
 end
 
-% The duration of this model is the time between the two relevant casts. 
-dur = hours(duration(datetime(CTD.mtime(7),"convertfrom","datenum")-datetime(CTD.mtime(6),"convertfrom","datenum")));
+% The duration of this model is the time between the two relevant casts.
+dur = hours(duration(datetime(CTD.mtimed(7),"convertfrom","datenum")-datetime(CTD.mtimed(6),"convertfrom","datenum")));
 % Having NaN parameter values in a differential equation solver will result
 % in the entire field going NaN.
 Kzfilt(isnan(Kzfilt)) = tinynum; 
 Kzfiltd = 3600.*Kzfilt; %Convert to m^-2 hr^-1
-% Evaluate at 10 m intervals.
-zInt = [0:10:200]';
+
 
 highmeans = mean(mtab_C6N13,2,"omitmissing");
 normalmeans = mean(mtabData(relconcs_flag13 >=2,sInfo.cast>0),2,"omitmissing");
 datapts = [mtabData(relconcs_flag13 >=2, sInfo.CN=="C6N13"),...
     mtabData(relconcs_flag13 >=2, sInfo.CN=="C7N13")];
+datapts(isnan(datapts))=0;
 xpts = [0,0,0,dur,dur,dur];
 
-for ii=1:length(HighNames)
+if 0
+    for ii=1:length(HighNames)
 
-    baseline = normalmeans(ii);
-    highconc = highmeans(ii);
-    name = HighNames(ii);
+        baseline = normalmeans(ii);
+        highconc = highmeans(ii);
+        name = HighNames(ii);
 
-    % Initial boundary conditions are determined by a baseline metabolite
-    % concentration (an average) with random variation. At a single point, we
-    % spike this to an average concentration within the C6N13 samples.
-    C0 = 1000.*(baseline + (randn(21,1)./10));
-    C0(13) = 1000.*highconc; % Initial conditions in pmol m^-3
-    zInt = [0:10:200]';
-    % Smoothing?
-    if mvavg == 1
-        C0 = movmean(C0,3,1,"omitmissing","Endpoints","fill");
-    elseif interpC0 == 1
-        C0 = interp1(zInt,C0,0:2.5:200,"spline");
-        zInt = [0:2.5:200]';
+        % Initial boundary conditions are determined by a baseline metabolite
+        % concentration (an average) with random variation. At a single point, we
+        % spike this to an average concentration within the C6N13 samples.
+        C0 = 1000.* [baseline;...
+            mean([baseline,highconc]);...
+            highconc;
+            mean([baseline,highconc]);...
+            baseline];  % Initial conditions in pmol m^-3
+        z0= zm + [-zb; -zg ; 0 ;  zg ; zb];
+        % Smoothing?
+        if mvavg == 1
+            C0 = movmean(C0,3,1,"omitmissing","Endpoints","fill");
+        elseif interpC0 == 1
+
+            zInt = [zm-zb:0.1:zm+zb]';
+            C0 = interp1(z0,C0,zInt,"makima");
+            zInt = [zm - 2*zb:0.1: zm + 2*zb]';
+            C0 = [C0(1).*ones(10*zb,1);C0;C0(end).*ones(10*zb,1)];
+        end
+
+
+
+        % How closely do we want the solving intervals spaced?
+        tint = linspace(0,dur,npts);
+
+        % Constructing the function to be integrated.
+        dC = @(g,z) deriv1(g,z);
+        gx = @(Kz,C,z) Kz.*deriv1(C,z);
+
+
+        if dummyKz==1
+            Kzdummy = mean([Kzfiltd(1:120,7);Kzfiltd(1:120,8)]).*ones(size(zInt));
+            dCdt = @(t,C) dC(gx(Kzdummy,C,zInt),zInt);
+        elseif dummyKz==2
+            Kzdummy = max([Kzfiltd(1:120,7);Kzfiltd(1:120,8)]).*ones(size(zInt));
+            Kzdummy(isnan(Kzdummy)) = tinynum;
+            dCdt = @(t,C) dC(gx(Kzdummy,C,zInt),zInt);
+        else
+            Kzi = @(t) KzInterp(interp1(CTD.de(1:120,7),Kzfiltd(1:120,7),zInt),...
+                interp1(CTD.de(1:120,8),Kzfiltd(1:120,8),zInt),...
+                0,dur,t);
+            dCdt = @(t,C) dC(gx(Kzi(t),C,zInt),zInt);
+        end
+
+        [tsol, Cfield] = ode45(dCdt,tint,C0);
+
+        if 0
+            f = figure("Visible","off");
+            subplot(3,1,1:2)
+            contourf(tsol,zInt,Cfield'./1000)
+            ax = gca;
+            ax.YDir = "reverse";
+            ax.YLim = zm + [-zb,zb];
+            ylabel("depth (m)"); xlabel("time (h)");
+            c = colorbar(); c.Label.String = [name + " (pM)"];
+            clim([0 max(C0)/1000])
+            set(ax, "ColorScale", "linear", "Colormap", cmap3)
+
+            subplot(3,1,3)
+            p = plot(tsol,Cfield(:,find(C0 == max(C0)))'./1000);
+            p.LineWidth = 2; p.Color = soft{1};
+            hold on
+            sc = scatter(xpts,datapts(ii,:),30,"filled","o", "MarkerFaceColor", soft{2});
+            ylabel(["Conc at " + string(zInt(C0 == max(C0))) + " m (pM)"])
+            xlabel("time (h)")
+            legend({"Modeled Concentration w/Mixing", "Measured Concentrations"})
+            ylim([0,max(datapts(ii,:))+5])
+            xlim([-0.5, 6.7])
+            filename = saveDir + name + "_eddydiffusion.png";
+            saveas(f, filename)
+            exportgraphics(f, filename, 'ContentType', 'vector', 'BackGroundColor', 'none');
+            close
+        end
     end
-    % How closely do we want the solving intervals spaced?
-    tint = linspace(0,dur,npts);
-
-    % Constructing the function to be integrated.
-    dC = @(g,z) deriv1(g,z);
-    gx = @(Kz,C,z) Kz.*deriv1(C,z);
-
-
-    if dummyKz==1
-        Kzdummy = mean([Kzfiltd(1:120,6);Kzfiltd(1:120,7)]).*ones(size(zInt));
-        dCdt = @(t,C) dC(gx(Kzdummy,C,zInt),zInt);
-    elseif dummyKz==2
-        Kzdummy = max([Kzfiltd(1:120,6);Kzfiltd(1:120,7)]).*ones(size(zInt));
-        Kzdummy(isnan(Kzdummy)) = tinynum;
-        dCdt = @(t,C) dC(gx(Kzdummy,C,zInt),zInt);
-    else
-        Kzi = @(t) KzInterp(interp1(CTD.de(1:120,6),Kzfiltd(1:120,6),zInt),...
-            interp1(CTD.de(1:120,7),Kzfiltd(1:120,7),zInt),...
-            0,dur,t);
-        dCdt = @(t,C) dC(gx(Kzi(t),C,zInt),zInt);
-    end
-
-    [tsol, Cfield] = ode45(dCdt,tint,C0);
-    
-    f = figure("Visible","off");
-    subplot(3,1,1:2)
-    contourf(tsol,zInt,Cfield'./1000)
-    ax = gca;
-    ax.YDir = "reverse";
-    ax.YLim = [105,135];
-    ylabel("depth (m)"); xlabel("time (h)");
-    c = colorbar(); c.Label.String = [name + " (pM)"];
-    clim([0 max(C0)/1000])
-    set(ax, "ColorScale", "linear", "Colormap", cmap3)
-
-    subplot(3,1,3)
-    p = plot(tsol,Cfield(:,find(C0 == max(C0)))'./1000);
-    p.LineWidth = 2; p.Color = soft{1};
-    hold on
-    sc = scatter(xpts,datapts(ii,:),30,"filled","o", "MarkerFaceColor", soft{2});
-    ylabel(["Conc at " + string(zInt(C0 == max(C0))) + " m (pM)"])
-    xlabel("time (h)")
-    legend({"Modeled Concentration w/Mixing", "Measured Concentrations"})
-    ylim([min(datapts(ii,:)),max(datapts(ii,:))])
-    filename = saveDir + name + "_eddydiffusion.png";
-    saveas(f, filename)
-    exportgraphics(f, filename, 'ContentType', 'vector', 'BackGroundColor', 'none');
-    close
 end
-
 %% Evaluating the relationship between metabolites and vertical zones
 
 figure("Visible","on")
 subplot(2,1,1)
-contourf(repmat(CTD.mtime,2500,1),CTD.de,CTD.vertZone)
+contourf(repmat(CTD.mtimed,2500,1),CTD.de,CTD.vertZone)
 ax = gca;
 ax.YDir = "reverse";
 ax.YLim = [0 200];
 ax.XTickLabel = "";
-ax.XLim = [min(CTD.mtime), max(CTD.mtime)];
+ax.XLim = [min(CTD.mtimed), max(CTD.mtimed)];
 c1 = colorbar;
 clim([0 3])
 
 
 subplot(2,1,2)
-goodGlider = M17.sttime>=min(CTD.mtime) &...
-    M17.sttime<=max(CTD.mtime)&...
+goodGlider = M17.sttime>=min(CTD.mtimed) &...
+    M17.sttime<=max(CTD.mtimed)&...
     M17.dc==1;
 contourf(M17.time(:,goodGlider),M17.de(:,goodGlider),M17.vertZone(:,goodGlider))
 ax = gca;
@@ -573,7 +563,7 @@ ax.YLim = [0 200];
 datetick("x","YYYY-mm-dd HH:MM")
 c2 = colorbar;
 clim([0 3])
-ax.XLim = [min(CTD.mtime), max(CTD.mtime)];
+ax.XLim = [min(CTD.mtimed), max(CTD.mtimed)];
 
 % This all tells us that while zone 0 is fairly consistent, the glider data
 % doesn't exactly agree with the CTD, and that there's a chunk of missing
