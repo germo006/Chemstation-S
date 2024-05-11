@@ -43,6 +43,23 @@ cmap = [[0 0 0];cmap1;cmap2];
 
 clear low mid high cmap1 cmap2
 
+% Second colormap
+
+low = col{10};
+mid = col{5};
+high = col{2};
+% end user inputs
+
+cmap1 = [linspace(low(1), mid(1), 10)',...
+    linspace(low(2), mid(2), 10)',...
+    linspace(low(3),mid(3), 10)'];
+cmap2 = [linspace(mid(1), high(1), 10)',...
+    linspace(mid(2), high(2), 10)',...
+    linspace(mid(3), high(3), 10)'];
+cmap2 = [[0 0 0];cmap1;cmap2];
+
+clear low mid high cmap1
+
 %% If you need an idea of what the colormap you chose looks like.
 
 colordemo = 1; % 1 for scatter of col, 2 for contour plot of cmap.
@@ -85,17 +102,40 @@ setDefaults
 
 f = figure;
 [pax, xax, yax] = diAxes_Depth(f);
-
-cf = contourf(XRANGE, YRANGE, interpFL);
+parax = axes("Position",pax.Position,"YDir","reverse");
+chax = axes("Position",pax.Position,"YDir","reverse");
+linkaxes([pax, parax, chax])
+%cf = contour(pax, XRANGE, YRANGE, interpFL);
 colormap(pax, cmap);
+pax.Color = [0 0 0];
 
 ylabel(yax,"Depth, m");
 
 pax.XLim = [min(XRANGE(1,:)+1),max(XRANGE(1,:))-0.75];
-datetick(xax, "x", "mmm dd")
+datetick(xax, "x", "mmm dd HH:MM")
+xax.XTick = [738471, 738471.5,738472,738472.5,738473];
+xax.XTickLabel = [["Nov 11 00:00"],["12:00"],["Nov 12 00:00"],["12:00"],["Nov 13 00:00"]];
 pax.YLim = [min(YRANGE(:,1)),max(YRANGE(:,1))];
 
 hold on
+
+
+parax.XTick = []; parax.YTick = []; parax.Visible = "off";
+chax.XTick = []; chax.YTick = []; chax.Visible = "off";
+colormap(parax,"gray")
+colormap(chax,cmap2(2:end,:))
+lpar = log10(CTD.par(:));
+lparf = ~isinf(lpar);
+
+mattimes = datenum(repmat(CTD.mtime,length(CTD.de),1));
+parscatter = scatter(parax,mattimes(lparf)-0.01,CTD.de(lparf),60,"filled","s","CData",lpar(lparf),"MarkerFaceAlpha",1);
+c1 = colorbar(parax, "Position",[0.83 0.05 0.02 0.75],"AxisLocation","in");
+c2 = colorbar(chax, "Position",[0.85 0.05 0.02 0.75]);
+c1.Label.String = "log_{10}(PAR, \muE m^{-2} s^{-1})";
+c2.Label.String = "Chl Fluorescence, RFU";
+c1.TickDirection = "none"; c2.TickDirection = "none";
+%c1.Tick
+chscatter = scatter(chax,mattimes(:)+0.01,CTD.de(:),60,"filled","s","CData",CTD.fluor_filt(:),"MarkerFaceAlpha",1);
 % parcontour = contour(XRANGE, YRANGE, ...
 %     interpPAR, [100 100], "Visible","off","HandleVisibility","off");
 % parcontour(:,parcontour(2,:)<1|parcontour(2,:)>90|parcontour(1,:)>pax.XLim(2))=[];
@@ -108,12 +148,12 @@ hold on
 
 
 plotmld = plot(pax, XRANGE(1,:),interp1(datenum(CTD.mtime), CTD.MLD_bvfrq,XRANGE(1,:)),...
-    ".-k", "LineWidth", 6, "Color","k", "HandleVisibility","on");
+    ".-k", "LineWidth", 2, "Color",col{7}, "HandleVisibility","on");
 
-l = legend({"Chlorophyll Fluorescence, RFU", "PAR, 100 \muE m^{-2} s^{-1}",...
-    "Mixed Layer Depth"}, "Box","on","Color", [1,1,1],...
-    ..."LineStyle", "none",... "Alpha", 0.5, ...
-    "Location", "southeast");
+% l = legend({"Chlorophyll Fluorescence, RFU", "PAR, 100 \muE m^{-2} s^{-1}",...
+%     "Mixed Layer Depth"}, "Box","on","Color", [1,1,1],...
+%     ..."LineStyle", "none",... "Alpha", 0.5, ...
+%     "Location", "southeast");
 
 %% Multiple-Cast Plot
 
@@ -158,8 +198,8 @@ end
 
 %% Metabolite Profile Generation
 
-mtab = "malic acid";
-cnum = 8;
+mtab = "arginine";
+cnum = 3;
 PF = "fluorescence";
 
 iC = sInfo.cast==cnum;
@@ -168,30 +208,31 @@ mtemp = mtabData(m,:);
 mtemp = mtemp(iC);
 zdata = sInfo.CTDdepth(iC);
 f = figure("Position",[1000, 443, 630, 857]);
-[plotAx, xax, yax] = diAxes_Depth(f);
-sc = scatter(plotAx,mtemp,zdata, 100, "o",... "MarkerFaceColor","k",...
-    "MarkerEdgeColor", "k", "LineWidth",3, "HandleVisibility","off");
-set([xax,yax],"FontSize", 24, "FontName", "arial", "FontWeight", "normal")
+[plotAx,plotAx2, xax, xax2, yax] = triAxes_Depth(f);
+sc = scatter(plotAx,mtemp,zdata, 100, "o", "MarkerFaceColor",col{2},...
+    "MarkerEdgeColor", "k", "LineWidth",1.5, "HandleVisibility","off");
+set([xax,yax, xax2],"FontSize", 24, "FontName", "arial", "FontWeight", "normal")
 xlabel(xax,["["+mtab+"], pM"])
 hold on
 plot(plotAx,[LOD(m) LOD(m)], [0 250], "-.", "LineWidth",2,"Color","k",...
     "HandleVisibility","off");
-text(1.8*LOD(m),20,"LOD","FontSize",20,"Rotation",90,...
+text(1.5*LOD(m),20,"LOD","FontSize",20,"Rotation",90,...
     "HandleVisibility","off")
 if PF == "fluorescence"
     fact = round(max(mtemp)./max(CTD.fluor_filt(:,cnum)),0);
-    plot(plotAx,fact*CTD.fluor_filt(:,cnum),CTD.de(:,cnum),"-", "LineWidth",2, "Color", col{4})
+    plot(plotAx2,CTD.fluor_filt(:,cnum),CTD.de(:,cnum),"-", "LineWidth",2, "Color", col{9})
     l= legend({"Scaled Chl Fluorescence"},...
         "location", "southeast", "Color","none","Box", "off");
+    xlabel(xax2, "Chl Fluorescence, RFU")
 elseif PF =="PAR"
-    plot(plotAx,CTD.par(:,cnum)./1e2,CTD.de(:,cnum),"-", "LineWidth",2, "Color", col{4})
+    plot(plotAx2,CTD.par(:,cnum)./1e2,CTD.de(:,cnum),"-", "LineWidth",2, "Color", col{4})
     xlabel("concentration or PAR")
     l= legend({["["+mtab+"], pM"], "LOD, pM", "PAR (10^{-2} \muE m^{-2} s^{-1})"},...
         "location", "southeast", "Color","none","Box", "off");
 end
 plot(plotAx, [0,max(mtemp)], [CTD.MLD_bvfrq(cnum), CTD.MLD_bvfrq(cnum)],...
     ":", "Color",col{8}, "LineWidth", 3, "HandleVisibility","off")
-text(1.3*LOD(m),CTD.MLD_bvfrq(cnum)+5,"MLD","FontSize",20, "HandleVisibility","off",...
+text(4*LOD(m),CTD.MLD_bvfrq(cnum)+5,"MLD","FontSize",20, "HandleVisibility","off",...
     "Color",col{8},"HorizontalAlignment","left")
 l.FontSize = 24;
 titlestring = ["Cast " + string(cnum) + ", " +...
@@ -201,15 +242,18 @@ l.FontWeight = "normal";
 ylabel(yax,"depth, m")
 ylim(yax,[0 210])
 xlim(xax,[0 max(mtemp)])
+xlim(xax2, [0, max(CTD.fluor_filt(:,cnum))])
+set(xax2,"XColor", col{9})
+ylim(plotAx2, [0 210])
 
 %% Statistical distributions
 
-mtabnorm = mtabData./mean(mtabData,2,"omitmissing");
-LODnorm = LOD./mean(mtabData,2,"omitmissing");
+mtabnorm = mtabData./mean(mtabData,2,"omitnan");
+LODnorm = LOD./mean(mtabData,2,"omitnan");
 h = histogram(mtabnorm(~isnan(mtabnorm)), "Normalization","probability","NumBins",200);
 h.EdgeColor = col{2}; h.LineWidth = 3;
-logmu = mean(mean(log(mtabnorm),2,"omitmissing"));
-logstd = std(log(mtabnorm),[],"all","omitmissing");
+logmu = mean(mean(log(mtabnorm),2,"omitnan"));
+logstd = std(log(mtabnorm),[],"all","omitnan");
 x = [0,diff(h.BinEdges)]+h.BinEdges;
 y = lognpdf(x,logmu, logstd);
 hold on
@@ -217,7 +261,7 @@ hold on
 mtabSub = mtabData; 
 subvals = isnan(mtabSub).*(LOD./10); subvals(subvals==0) = [];
 mtabSub(isnan(mtabSub)) = subvals;
-mtabSubnorm = mtabSub./mean(mtabSub,2,"omitmissing");
+mtabSubnorm = mtabSub./mean(mtabSub,2,"omitnan");
 
 p = plot(x,y);
 h2 = histogram(mtabSubnorm,"Normalization","probability","NumBins",h.NumBins); h2.BinEdges=h.BinEdges;
@@ -236,8 +280,8 @@ mtemp = mtabnorm(m,:);
 h3 = histogram(mtemp(~isnan(mtemp)),"Normalization","probability", "FaceColor","none","NumBins",200);
 h3.EdgeColor = col{7}; h3.LineWidth = 2;
 
-logmu = mean(mean(log(mtemp),2,"omitmissing"));
-logstd = std(log(mtemp),[],"all","omitmissing");
+logmu = mean(mean(log(mtemp),2,"omitnan"));
+logstd = std(log(mtemp),[],"all","omitnan");
 x = [0,diff(h3.BinEdges)]+h3.BinEdges;
 y = lognpdf(x,logmu, logstd);
 p2 = plot(x,y);
@@ -251,7 +295,8 @@ legend({"Samples, <LOD excluded",...
 %% zooplankton stuff
 load("../datasets/zoopRates.mat")
 %% Now, plots and data processing
-[cpeeavg, cpeestd, colNames, nets] = CopeRate("AE1712", pxtabs6, pxnames,sInfo,nicenames,mtabData, 1, col);
+time = 1;
+[cpeeavg, cpeestd, colNames, nets] = CopeRate("AE1712", pxtabs6, pxnames,sInfo,nicenames,mtabData, 1, col,time);
 
 %%
 inight = (sInfo.timehhMM>=2000 | sInfo.timehhMM<800);
@@ -282,21 +327,21 @@ cpeeSN = cpeestdOrd([16,15],:)'./12;
 errorf = @(e1,e2,m1,m2,v) v.*sqrt((e1./m1).^2+(e2./m2).^2);
 
 peetable = table(colNamesOrd);
-peetable.ML_Day = mean(pxFD_ML,2,"omitmissing")./cpeeRD(:,1);
-peetable.std_ML_Day = errorf(std(pxFD_ML,[],2,"omitmissing"),...
-    cpeeSD(:,1),mean(pxFD_ML,2,"omitmissing"),cpeeRD(:,1),...
+peetable.ML_Day = mean(pxFD_ML,2,"omitnan")./cpeeRD(:,1);
+peetable.std_ML_Day = errorf(std(pxFD_ML,[],2,"omitnan"),...
+    cpeeSD(:,1),mean(pxFD_ML,2,"omitnan"),cpeeRD(:,1),...
     peetable.ML_Day);
-peetable.ML_Night = mean(pxFN_ML,2,"omitmissing")./cpeeRN(:,1);
-peetable.std_ML_Night = errorf(std(pxFN_ML,[],2,"omitmissing"),...
-    cpeeSN(:,1),mean(pxFN_ML,2,"omitmissing"),cpeeRN(:,1),...
+peetable.ML_Night = mean(pxFN_ML,2,"omitnan")./cpeeRN(:,1);
+peetable.std_ML_Night = errorf(std(pxFN_ML,[],2,"omitnan"),...
+    cpeeSN(:,1),mean(pxFN_ML,2,"omitnan"),cpeeRN(:,1),...
     peetable.ML_Night);
-peetable.Deep_Day = mean(pxFD_Deep,2,"omitmissing")./cpeeRD(:,2);
-peetable.std_Deep_Day = errorf(std(pxFD_Deep,[],2,"omitmissing"),...
-    cpeeSD(:,2),mean(pxFD_Deep,2,"omitmissing"),cpeeRD(:,2),...
+peetable.Deep_Day = mean(pxFD_Deep,2,"omitnan")./cpeeRD(:,2);
+peetable.std_Deep_Day = errorf(std(pxFD_Deep,[],2,"omitnan"),...
+    cpeeSD(:,2),mean(pxFD_Deep,2,"omitnan"),cpeeRD(:,2),...
     peetable.Deep_Day);
-peetable.Deep_Night = mean(pxFN_Deep,2,"omitmissing")./cpeeRN(:,2);
-peetable.std_Deep_Night = errorf(std(pxFN_Deep,[],2,"omitmissing"),...
-    cpeeSN(:,2),mean(pxFN_Deep,2,"omitmissing"),cpeeRN(:,2),...
+peetable.Deep_Night = mean(pxFN_Deep,2,"omitnan")./cpeeRN(:,2);
+peetable.std_Deep_Night = errorf(std(pxFN_Deep,[],2,"omitnan"),...
+    cpeeSN(:,2),mean(pxFN_Deep,2,"omitnan"),cpeeRN(:,2),...
     peetable.Deep_Night);
 
 %% A Plot about Mixing or Two
@@ -335,8 +380,8 @@ Kzfilt(isnan(Kzfilt)) = tinynum;
 Kzfiltd = 3600.*Kzfilt; %Convert to m^-2 hr^-1
 
 
-highmeans = mean(mtab_C6N13(:,2:3),2,"omitmissing");
-normalmeans = mean(mtabData(relconcs_flag13 >=2,sInfo.cast>0),2,"omitmissing");
+highmeans = mean(mtab_C6N13(:,2:3),2,"omitnan");
+normalmeans = mean(mtabData(relconcs_flag13 >=2,sInfo.cast>0),2,"omitnan");
 datapts = [mtabData(relconcs_flag13 >=2, sInfo.CN=="C6N13"),...
     mtabData(relconcs_flag13 >=2, sInfo.CN=="C7N13")];
 datapts(:,1) = [];
@@ -360,7 +405,7 @@ C0 = 1000.* [baseline;...
 z0= zm + [-zb; -zg ; 0 ;  zg ; zb];
 % Smoothing?
 if mvavg == 1
-    C0 = movmean(C0,3,1,"omitmissing","Endpoints","fill");
+    C0 = movmean(C0,3,1,"omitnan","Endpoints","fill");
 elseif interpC0 == 1
 
     zInt = [zm-zb:0.1:zm+zb]';
@@ -416,9 +461,9 @@ p = plot(tsol,Cfield(:,(C0 == max(C0)))'./1000);
 p.LineWidth = 2; p.Color = col{7};
 hold on
 n = sum(~isnan(mtabData(nicenames==nicenames(ii),sInfo.CTDdepth<75)));
-sc2 = errorbar(max(xpts),mean(mtabData(nicenames==nicenames(ii),sInfo.CTDdepth<75),"omitmissing"),...
-    std(mtabData(nicenames==nicenames(ii),sInfo.CTDdepth<75),[],"omitmissing")/sqrt(n),...
-    std(mtabData(nicenames==nicenames(ii),sInfo.CTDdepth<75),[],"omitmissing")/sqrt(n),...
+sc2 = errorbar(max(xpts),mean(mtabData(nicenames==nicenames(ii),sInfo.CTDdepth<75),"omitnan"),...
+    std(mtabData(nicenames==nicenames(ii),sInfo.CTDdepth<75),[],"omitnan")/sqrt(n),...
+    std(mtabData(nicenames==nicenames(ii),sInfo.CTDdepth<75),[],"omitnan")/sqrt(n),...
     "Marker","o", "MarkerFaceColor", soft{2}, "LineStyle","none", "LineWidth",2,...
     "MarkerSize",10, "Color", col{9});
 sc = scatter(xpts(1:2),datapts(ii,1:2),200,"filled","s", "MarkerFaceColor",...

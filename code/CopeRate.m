@@ -1,7 +1,7 @@
 %% Noah Germolus 12 Feb 2024
 % This is a code that does what Amy's allometric respiration code for
 % MOCNESS data does, but worse. 
-function [cpeeavg, cpeestd, colNames, nets] = CopeRate(id, pxtabs6, pxnames,sInfo,nicenames,mtabData, plot, color)
+function [cpeeavg, cpeestd, colNames, nets] = CopeRate(id, pxtabs6, pxnames,sInfo,nicenames,mtabData, plot, color,time)
 
 if id=="AE1712"
 night = readtable("../datasets/M9_test_Classified_FOR_MATLAB.csv");
@@ -46,10 +46,10 @@ day(~contains(day.Taxa, "Copepoda"), :) = [];
 night(contains(night.Taxa, "dead"), :) = [];
 day(contains(day.Taxa, "dead"), :) = [];
 
-Copepee_avg_day = day.DW*median(pxtabs6, 1, "omitmissing");
-Copepee_std_day = day.DW*std(pxtabs6, 1, "omitmissing");
-Copepee_avg_night = night.DW*median(pxtabs6, 1, "omitmissing");
-Copepee_std_night = night.DW*std(pxtabs6, 1, "omitmissing");
+Copepee_avg_day = day.DW*median(pxtabs6, 1, "omitnan");
+Copepee_std_day = day.DW*std(pxtabs6, 1, "omitnan");
+Copepee_avg_night = night.DW*median(pxtabs6, 1, "omitnan");
+Copepee_std_night = night.DW*std(pxtabs6, 1, "omitnan");
 
 sizefrac_day = findgroups(day.net,day.fraction);
 sizefrac_night = findgroups(night.net,night.fraction);
@@ -89,8 +89,8 @@ cpeeday_std = splitapply(@sum,Copepee_std_day_fracs,addgrps_day);
 cpeenight = splitapply(@sum,Copepee_avg_night_fracs,addgrps_night);
 cpeenight_std = splitapply(@sum,Copepee_std_night_fracs,addgrps_night);
 
-cpeeavg = 12.*[cpeeday;cpeenight]./nets.Tow_Vol;%./1000;
-cpeestd = 12.*[cpeeday_std;cpeenight_std]./nets.Tow_Vol;%./1000;
+cpeeavg = time.*[cpeeday;cpeenight]./nets.Tow_Vol;%./1000;
+cpeestd = time.*[cpeeday_std;cpeenight_std]./nets.Tow_Vol;%./1000;
 
 id = sum(cpeeavg,1) ==0;
 colNames = pxnames(~id);
@@ -102,7 +102,7 @@ if plot~=0
     if(~exist("../images/DNplots","dir"))
         mkdir("../images/DNplots");
     end
-    for ii = 1:8
+    for ii = 1:2
         mtab = find(colNames == pxnames(end-ii+1));
 
         %% If you really wanna get nuts with it
@@ -120,28 +120,28 @@ if plot~=0
             factor = 1;
             md = factor.*mtabData(im, iday);
             mn = factor.*mtabData(im, inight);
-            f = figure("Position",[100 100 1000 1000], "Color","none");
-            ax1 = axes(f, "Position",[0.1300,0.1100,0.3700,0.8150]);
+            f = figure("Position",[100 100 1000 1000], "Color","w");
+            ax1 = axes(f, "Position",[0.1300,0.05,0.3700,0.87]);
 
             b1 = barh(ax1,...
                 mean([nets.Min_depth(nets.D_N=="d"),nets.Max_depth(nets.D_N=="d")],2),...
                 cpeeavg(nets.D_N=="d",mtab));
             b1.FaceColor = color{2};
-            b1.EdgeColor = color{7};
-            b1.FaceAlpha = 0.7;b1.EdgeAlpha = 0.7;
-            b1.BarWidth = 0.5.*b1.BarWidth;
+            b1.EdgeColor = color{10};
+            b1.FaceAlpha = 0.9;b1.EdgeAlpha = 0.9;
+            b1.BarWidth = 0.25.*b1.BarWidth;
             hold on
-            scd = scatter(ax1,md, zd,500, 'filled', 'o', "MarkerEdgeColor",b1.EdgeColor,"MarkerFaceColor",b1.FaceColor);
-            ax2 = axes(f,"Position", [0.5000, 0.1100, 0.3700, 0.8150]);
+            scd = scatter(ax1,md, zd,50, 'filled', '<', "MarkerEdgeColor",b1.EdgeColor,"MarkerFaceColor",b1.FaceColor);
+            ax2 = axes(f,"Position", [0.5000, 0.05, 0.3700, 0.87]);
             b2 = barh(ax2,...
                 mean([nets.Min_depth(nets.D_N=="n"),nets.Max_depth(nets.D_N=="n")],2),...
                 cpeeavg(nets.D_N=="n",mtab));
-            b2.FaceColor = color{7};
+            b2.FaceColor = color{10};
             b2.EdgeColor = color{2};
-            b2.FaceAlpha = 0.7;b2.EdgeAlpha=0.7;
-            b2.BarWidth = 0.5.*b2.BarWidth;
+            b2.FaceAlpha = 0.9;b2.EdgeAlpha=0.7;
+            b2.BarWidth = b1.BarWidth;
             hold on
-            scn = scatter(ax2,mn, zn,500, 'filled', 'pentagram', "MarkerEdgeColor",b2.EdgeColor,"MarkerFaceColor",b2.FaceColor);
+            scn = scatter(ax2,mn, zn,50, 'filled', '>', "MarkerEdgeColor",b2.EdgeColor,"MarkerFaceColor",b2.FaceColor);
             hold on
 
             ax1.YDir = "reverse"; ax2.YDir = "reverse";
@@ -155,20 +155,21 @@ if plot~=0
             b1.LineWidth = 2;b2.LineWidth = 2;
             bl1 = b1.BaseLine; bl2 = b2.BaseLine;
             bl1.Visible = "off";
+            ax2.YLim = [0 550];
             ax1.YLim = ax2.YLim;
             xl = max([ax1.XLim;ax2.XLim]);
             ax1.XLim = xl; ax2.XLim = xl;
             ax1.YLabel.String = "depth, m";
-            ax2.XLabel.String = {"[bar]:";"12 h concentration increase, pM"};
+            ax2.XLabel.String = [string(time)+" h \Delta["+colNames(mtab)+"], pM"];
             if factor==1
-                ax1.XLabel.String = {"[scatter]:";["AE2123 ambient concentration, pM"]};
+                ax1.XLabel.String = ["AE2123 ["+colNames(mtab)+"], pM"];
             else
-                ax1.XLabel.String = {"[scatter]:";[string(factor)+"*AE2123 ambient concentration, pM"]};
+                ax1.XLabel.String = {["["+colNames(mtab)+"]:"];[string(factor)+"*AE2123 ambient concentration, pM"]};
             end
             
             ax2.YAxis.Color = "none";
 
-            title(ax1, colNames(mtab))
+            %title(ax1, colNames(mtab))
             ax1.FontSize = 14; ax2.FontSize = 14;
             defont = "arial";
             ax1.FontName = defont; ax2.FontName = defont;
@@ -181,10 +182,14 @@ if plot~=0
             t2.FontName = defont; t2.Color = b2.FaceColor; t2.FontSize = 24;
             t2.HorizontalAlignment = "right"; t2.FontWeight = "bold";
             ax1.XTick = ax2.XTick;
-            ax1.XTick(1) = [];
+            ax1.XTickLabelMode = ax2.XTickLabelMode;
+            ax1.XTickLabel = ax2.XTickLabel;
+            ax1.XTick(1) = []; ax1.XTickLabel(1) = [];
             ax1.XTickLabelRotation = 0;
             ax1.Color = "none";
             ax2.Color = "none";
+            ax1.XAxisLocation = "top";
+            ax2.XAxisLocation = "top";
         elseif plot==2
             nameadd = "";
             f = figure("Position",[100 100 1000 1000], "Color","none");

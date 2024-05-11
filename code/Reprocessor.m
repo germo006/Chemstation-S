@@ -115,7 +115,7 @@ if 0
             meanRep = splitapply(@nanmean, x, G);
             stdRep = splitapply(@nanstd, x, G);
             yUnique = unique(y);
-            if sum(x > 0, "omitmissing") < 3
+            if sum(x > 0, "omitnan") < 3
                 message = [mtabNames(mtab)+" has fewer than 3 nonzero data points in cast "+string(ii)+". No graph generated."];
                 disp(message)
                 continue
@@ -341,7 +341,7 @@ end
 % measurements and I will eliminate them to refine the contours.
 iC6N9 = find("C6N9" == sInfo.CN);
 iC6N13 = find("C6N13" == sInfo.CN);
-relConcs = mtabData./median(mtabData,2, "omitmissing");
+relConcs = mtabData./median(mtabData,2, "omitnan");
 sInfo_c6 = sInfo([iC6N9;iC6N13],:);
 relConcs_c6 = relConcs(:,[iC6N9;iC6N13]);
 sInfo_n6 = sInfo;
@@ -358,12 +358,12 @@ mtab_C6N13 = mtabData(relconcs_flag13>=2,iC6N13);
 % This file has data and code from Ruth Curry for glider/CTD/wind stuff (Kz)
 addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C4 Field Data\FromRuth/00Mfiles")
 addpath("F:\Noah Germolus\Documents\MIT-WHOI\Thesis\C4 Field Data\FromRuth/00Mfiles/bios")
-addpath("F:\Noah Germolus\Documents\MATLAB\divaformatlab")
-load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C4 Field Data/FromRuth/00CTD/20211110_92123_CTD.mat")
+addpath("F:/Noah Germolus\Documents\MATLAB\divaformatlab")
+load("F:\Noah Germolus\Documents\MIT-WHOI\Thesis/C4 Field Data/FromRuth/00CTD/20211110_92123_CTD.mat")
 CTD.mtime = datetime(CTD.mtime, "ConvertFrom", "datenum")-duration(4,0,0);
 CTD.mtimed = datenum(CTD.mtime);
-load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C4 Field Data/FromRuth/00Wind/ERA5_2017-2021.mat")
-load("F:/Noah Germolus/Documents/MIT-WHOI/Thesis/C4 Field Data/FromRuth/00Glider/MISSIONS_BPE2021.mat")
+load("F:\Noah Germolus\Documents\MIT-WHOI\Thesis/C4 Field Data/FromRuth/00Wind/ERA5_2017-2021.mat")
+load("F:\Noah Germolus\Documents\MIT-WHOI\Thesis/C4 Field Data/FromRuth/00Glider/MISSIONS_BPE2021.mat")
 % Now that I've gridded mtabs, I am also going to load-in individual CTD cast
 % files and concatenate them so that I can have high-resolution data for
 % PAR, among other things. 
@@ -449,8 +449,8 @@ Kzfilt(isnan(Kzfilt)) = tinynum;
 Kzfiltd = 3600.*Kzfilt; %Convert to m^-2 hr^-1
 
 
-highmeans = mean(mtab_C6N13,2,"omitmissing");
-normalmeans = mean(mtabData(relconcs_flag13 >=2,sInfo.cast>0),2,"omitmissing");
+highmeans = mean(mtab_C6N13,2,"omitnan");
+normalmeans = mean(mtabData(relconcs_flag13 >=2,sInfo.cast>0),2,"omitnan");
 datapts = [mtabData(relconcs_flag13 >=2, sInfo.CN=="C6N13"),...
     mtabData(relconcs_flag13 >=2, sInfo.CN=="C7N13")];
 datapts(isnan(datapts))=0;
@@ -474,7 +474,7 @@ if 0
         z0= zm + [-zb; -zg ; 0 ;  zg ; zb];
         % Smoothing?
         if mvavg == 1
-            C0 = movmean(C0,3,1,"omitmissing","Endpoints","fill");
+            C0 = movmean(C0,3,1,"omitnan","Endpoints","fill");
         elseif interpC0 == 1
 
             zInt = [zm-zb:0.1:zm+zb]';
@@ -539,33 +539,181 @@ if 0
     end
 end
 %% Evaluating the relationship between metabolites and vertical zones
+% 
+% figure("Visible","on")
+% subplot(2,1,1)
+% contourf(repmat(CTD.mtimed,2500,1),CTD.de,CTD.vertZone)
+% ax = gca;
+% ax.YDir = "reverse";
+% ax.YLim = [0 200];
+% ax.XTickLabel = "";
+% ax.XLim = [min(CTD.mtimed), max(CTD.mtimed)];
+% c1 = colorbar;
+% clim([0 3])
 
-figure("Visible","on")
-subplot(2,1,1)
-contourf(repmat(CTD.mtimed,2500,1),CTD.de,CTD.vertZone)
-ax = gca;
-ax.YDir = "reverse";
-ax.YLim = [0 200];
-ax.XTickLabel = "";
-ax.XLim = [min(CTD.mtimed), max(CTD.mtimed)];
-c1 = colorbar;
-clim([0 3])
-
-
-subplot(2,1,2)
-goodGlider = M17.sttime>=min(CTD.mtimed) &...
-    M17.sttime<=max(CTD.mtimed)&...
-    M17.dc==1;
-contourf(M17.time(:,goodGlider),M17.de(:,goodGlider),M17.vertZone(:,goodGlider))
-ax = gca;
-ax.YDir = "reverse";
-ax.YLim = [0 200];
-datetick("x","YYYY-mm-dd HH:MM")
-c2 = colorbar;
-clim([0 3])
-ax.XLim = [min(CTD.mtimed), max(CTD.mtimed)];
+% 
+% subplot(2,1,2)
+% goodGlider = M17.sttime>=min(CTD.mtimed) &...
+%     M17.sttime<=max(CTD.mtimed)&...
+%     M17.dc==1;
+% contourf(M17.time(:,goodGlider),M17.de(:,goodGlider),M17.vertZone(:,goodGlider))
+% ax = gca;
+% ax.YDir = "reverse";
+% ax.YLim = [0 200];
+% datetick("x","YYYY-mm-dd HH:MM")
+% c2 = colorbar;
+% clim([0 3])
+% ax.XLim = [min(CTD.mtimed), max(CTD.mtimed)];
 
 % This all tells us that while zone 0 is fairly consistent, the glider data
 % doesn't exactly agree with the CTD, and that there's a chunk of missing
 % glider data.
 
+%% Environmental Variables
+
+metaUn = sInfo(sInfo.CN~="pool"&sInfo.CN~="C0N0"&sInfo.CTDdepth<255,:);
+mtabData_dist = mtabData(:,sInfo.CN~="pool"&sInfo.CN~="C0N0"&sInfo.CTDdepth<255);
+[~, iCN] = sort(metaUn.CN);
+metaUn = metaUn(iCN,:);
+mtabData_dist = mtabData_dist(:,iCN);
+% % replace with zeros or LOD
+% LODRep = repmat(LOD,1,size(mtabData_dist,2));
+% mtabData_dist(isnan(mtabData_dist)|mtabData_dist==0) = LODRep(isnan(mtabData_dist)|mtabData_dist==0)./10;
+
+%eliminate many-NaN metabolites
+mtab_reduced = mtabData(:,sInfo.CN~="pool"&sInfo.CN~="C0N0"&sInfo.CTDdepth<255);
+mtab_reduced = mtab_reduced(:,iCN);
+nicenames_red = nicenames(sum(~isnan(mtab_reduced),2)>=50);
+mtab_reduced(sum(~isnan(mtab_reduced),2)<50,:) = [];
+
+LODRep = repmat(LOD,1,size(mtab_reduced,2));
+mtab_reduced(isnan(mtab_reduced)|mtab_reduced==0) = LODRep(isnan(mtab_reduced)|mtab_reduced==0)./10;
+
+G = findgroups(metaUn.CN);
+mtabdataMeans = splitapply(@mean,mtabData_dist',G)';
+mtabdataStd = splitapply(@std,mtabData_dist',G)';
+
+mtabdataMeans_red = splitapply(@mean,mtab_reduced',G)';
+mtabdataStd_red = splitapply(@std,mtab_reduced',G)';
+
+
+[~, iUN, ~] = unique(metaUn.CN);
+matchedMeta = metaUn(iUN,:);
+
+matchedMeta.fluor = zeros(height(matchedMeta),1);
+matchedMeta.PAR = zeros(height(matchedMeta),1);
+matchedMeta.O2 = zeros(height(matchedMeta),1);
+matchedMeta.VZ = zeros(height(matchedMeta),1);
+matchedMeta.t = zeros(height(matchedMeta),1);
+
+for ii=1:height(matchedMeta)
+    i2 = find(CTD.cast==matchedMeta.cast(ii));
+    fi = find((CTD.de(:,i2)<matchedMeta.CTDdepth(ii))==0);
+    i1 = fi(1);
+    clear fi
+    matchedMeta.fluor(ii) = CTD.fluor(i1,i2);
+    matchedMeta.PAR(ii) = CTD.par(i1,i2);
+    matchedMeta.O2(ii) = CTD.o2(i1,i2);
+    matchedMeta.VZ(ii) = CTD.vertZone(i1,i2);
+    matchedMeta.t(ii) = CTD.te(i1,i2);
+end
+
+
+%% Variance Among Metabolites
+
+addpath("F:/Noah Germolus/Documents/MATLAB/Fathom")
+mtabDataMeans_NoNAN = mtabdataMeans;
+mtabDataMeans_NoNAN(isnan(mtabDataMeans_NoNAN)) = 0;
+bcmt = f_braycurtis(mtabDataMeans_NoNAN);
+% nmds1 = mdscale(bcmt, 2);
+% scatter(nmds1(:,1),nmds1(:,2))
+
+enVecNames = ["z","Chl","PAR","Ox","VZ","temp"];
+enVM = table2array(matchedMeta(:,["CTDdepth","fluor","PAR","O2","VZ","t"]));
+
+corrNames = [nicenames_red;enVecNames'];
+FullCorrMat = [mtabdataMeans_red;enVM']';
+[rho, pval] = corr(FullCorrMat, "type","Spearman","rows","complete");
+corrtable = table(rho(:), pval(:));
+[V1, V2] = meshgrid(corrNames,corrNames);
+corrtable.v1 = V1(:); corrtable.v2 = V2(:);
+corrtable = unique(corrtable, "rows");
+corrtable.Properties.VariableNames = ["rho", "p", "V1", "V2"];
+corrtable(corrtable.p==1,:) = [];
+
+rho(pval>.05) = NaN;
+idx = ones(size(rho));
+idx = tril(idx);
+rho(~idx) = NaN;
+heatmap(rho,"YData",corrNames, "XData",corrNames, "MissingDataColor",[.5,.5,.5])
+colormap(cmap(2:end,:))
+
+%%
+x = "z"; xn = x;
+y = "malic acid"; yn = y;
+z = "temp"; zn = z;
+x = FullCorrMat(:,corrNames==x);
+% s = 0.5.*mtabdataStd_red(nicenames_red==y,:)';
+% y = 0.5.*FullCorrMat(:,corrNames==y);
+s = mtabdataStd_red(nicenames_red==y,:)';
+y = FullCorrMat(:,corrNames==y);
+z = FullCorrMat(:,corrNames==z);
+badpts = sum(isnan([x,y,z]),2)>0;
+x(badpts,:) = [];
+s(badpts,:) = [];
+y(badpts,:) = [];
+z(badpts,:) = [];
+
+eb2 = errorbar(x,y,s,...
+    "LineStyle", "none","CapSize",0,"LineWidth",2.5,"Color", "k");
+hold on
+sc2 = scatter(x,y,...
+    80,z, "filled", ...
+    "MarkerEdgeColor","k");
+
+ax = gca;
+colormap(flip(cmap(2:end,:)))
+switch xn
+    case "Chl"
+        xlabel("Chl Fluorescence, RFU")
+    case "temp"
+        xlabel("temperature, ^{\circ}C")
+
+    case "z"
+        xlabel("depth, m")
+        sc3 = scatter(x(x>78&x<93),y(x>78&x<93),...
+            80, z(x>78&x<93), "filled", ...
+            "MarkerEdgeColor","g", "LineWidth",3);
+    case "PAR"
+        xlabel("PAR, \muE s^{-1} m^{-2}")
+end
+% ylabel(["["+yn+"]_{corrected}, pM"])
+ylabel(["["+yn+"], pM"])
+ax.YLim(1) = 0;
+c = colorbar(ax);
+switch zn
+    case "z"
+        c.Label.String = "depth, m";
+        c.Direction = "reverse";
+        sc3 = scatter(x(z>78&z<93),y(z>78&z<93),...
+            80, z(z>78&z<93), "filled", ...
+            "MarkerEdgeColor","g", "LineWidth",3);
+    case "PAR"
+        c.Label.String = "PAR, \muE s^{-1} m^{-2}";
+        c.Direction = "reverse";
+    case "temp"
+        c.Label.String = "temperature, ^{\circ}C";
+        colormap(cmap(2:end,:))
+    case "Chl"
+        c.Label.String = "Chl Fluorescence, RFU";
+end
+% ax.YLim(2) = 80;
+% ax.XLim(2) = 25;
+if 1 && xn=="z"
+    yyaxis right
+    scC = scatter(addData.de,addData.cells, 80, "Marker", "x", "MarkerEdgeColor",...
+        col{8}, "LineWidth",3);
+    ylabel("prokaryotes, 10^8 cells kg^{-1}")
+    ax.YColor = "k";
+    ax.XLim(2) = 250;
+end
